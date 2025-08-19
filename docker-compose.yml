@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    container_name: aeroscan_db
+    environment:
+      POSTGRES_USER: aeroscan_user
+      POSTGRES_PASSWORD: aeroscan_pass
+      POSTGRES_DB: aeroscan_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - aeroscan_network
+
+  backend:
+    build: .
+    container_name: aeroscan_backend
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=aeroscan_db
+      - DB_USER=aeroscan_user
+      - DB_PASSWORD=aeroscan_pass
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    depends_on:
+      - db
+    volumes:
+      - ./temp_uploads:/app/temp_uploads
+    networks:
+      - aeroscan_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  aeroscan_network:
+    driver: bridge
