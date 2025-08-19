@@ -1,5 +1,6 @@
 import os
 import cv2
+from flask import send_from_directory
 import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -364,6 +365,10 @@ def listar_produtos():
         return jsonify({"erro": str(e)}), 500
     finally:
         db.close()
+
+@app.route('/camera')
+def camera_page():
+    return send_from_directory('static', 'camera.html')
 
 @app.route('/api/processar_video', methods=['POST'])
 def processar_video():
