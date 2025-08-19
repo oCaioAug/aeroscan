@@ -240,28 +240,6 @@ def extract_codes_from_image(filepath: str) -> Dict[str, Any]:
     return result
 
 
-def extract_qr_codes(filepath):
-    result = {"qr_codes": [], "barcodes": []}
-    try:
-        image = cv2.imread(filepath)
-        if image is None:
-            try:
-                os.remove(filepath)
-            except Exception:
-                pass
-            raise ValueError("Erro ao ler a imagem.")
-        detected = decode(image)
-        result["qr_codes"] = [d.data.decode("utf-8") for d in detected if d.type == "QRCODE"]
-        result["barcodes"] = [d.data.decode("utf-8") for d in detected if d.type != "QRCODE"]
-        return result
-    except Exception as e:
-        raise RuntimeError(f"Erro ao processar a imagem: {e}")
-    finally:
-        try:
-            os.remove(filepath)
-        except Exception:
-            pass
-
 def extrair_e_validar_codigos(caminho_do_video):
     """
     Extrai códigos de barras/QR codes de um vídeo e valida no banco de dados
