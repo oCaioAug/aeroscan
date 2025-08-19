@@ -4,6 +4,7 @@ import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pyzbar import pyzbar
+from pyzbar.pyzbar import decode
 from sqlalchemy import create_engine, Column, Integer, String, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -200,6 +201,44 @@ def validate_codes_in_database(codes: Set[str]) -> List[Dict[str, Any]]:
         db.close()
     
     return results
+
+# Função para extrair códigos de barras e QR codes de uma imagem
+def extract_codes_from_image(filepath: str) -> Dict[str, Any]:
+    """
+    Processa uma imagem, detecta QR codes e códigos de barras, trata erros e remove o arquivo temporário.
+    Args:
+        filepath (str): Caminho do arquivo de imagem
+    Returns:
+        dict: {'qr_codes': [...], 'barcodes': [...], 'error': ...}
+    """
+    result = {'qr_codes': [], 'barcodes': [], 'validation': [], 'error': None}
+    try:
+        image = cv2.imread(filepath)
+        if image is None:
+            os.remove(filepath)
+            result['error'] = 'Erro ao ler a imagem.'
+            return result
+        detected = decode(image)
+        qr_codes = [d.data.decode('utf-8') for d in detected if d.type == 'QRCODE']
+        barcodes = [d.data.decode('utf-8') for d in detected if d.type != 'QRCODE']
+        result['qr_codes'] = qr_codes
+        result['barcodes'] = barcodes
+        # Validação usando validate_codes_in_database
+        all_codes = set(qr_codes + barcodes)
+        try:
+            validation = validate_codes_in_database(all_codes)
+            result['validation'] = validation
+        except Exception as e:
+            result['error'] = f'Erro ao validar códigos: {str(e)}'
+    except Exception as e:
+        result['error'] = f'Erro ao processar a imagem: {str(e)}'
+    finally:
+        try:
+            os.remove(filepath)
+        except Exception:
+            pass
+    return result
+
 
 def extrair_e_validar_codigos(caminho_do_video):
     """
