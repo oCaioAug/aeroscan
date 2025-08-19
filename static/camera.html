@@ -8,7 +8,8 @@
       video { width: 100%; max-width: 400px; border: 1px solid #333; }
       select { margin-top: 10px; }
     </style>
-   <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
 </head>
 <body>
   <h2>Configurar Câmera do Celular</h2>
@@ -53,22 +54,50 @@
   const qrResult = document.getElementById('qrResult');
   const ctx = canvas.getContext('2d');
 
-  async function scanQRCode() {
+  async function scanQRCodeAndBarcode() {
     if (!currentStream) return;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // QR Code
     const code = jsQR(imageData.data, imageData.width, imageData.height);
-    if (code) {
-      qrResult.innerText = `QR Code detectado: ${code.data}`;
-    } else {
-      qrResult.innerText = 'Nenhum QR Code detectado';
-    }
+    let qrText = code ? `QR Code detectado: ${code.data}` : '';
+
+    // Barcode (usando QuaggaJS)
+    Quagga.decodeSingle({
+      src: canvas.toDataURL(),
+      numOfWorkers: 0,
+      inputStream: { size: 800 },
+      decoder: {
+        readers: [
+          "code_128_reader",
+          "ean_reader",
+          "ean_8_reader",
+          "code_39_reader",
+          "code_39_vin_reader",
+          "codabar_reader",
+          "upc_reader",
+          "upc_e_reader",
+          "i2of5_reader",
+          "2of5_reader",
+          "code_93_reader"
+        ]
+      }
+    }, function(result) {
+      let barcodeText = '';
+      if(result && result.codeResult) {
+        barcodeText = `Código de Barra detectado: ${result.codeResult.code}`;
+      } else {
+        barcodeText = 'Nenhum Código de Barra detectado';
+      }
+      qrResult.innerText = [qrText, barcodeText].filter(Boolean).join('\n');
+    });
   }
 
-  // Escaneia a cada 500ms
-  setInterval(scanQRCode, 500);
+  // Escaneia a cada 1000ms
+  setInterval(scanQRCodeAndBarcode, 1000);
 
     // Inicialização
     (async () => {
