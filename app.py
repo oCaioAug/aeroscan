@@ -211,7 +211,7 @@ def extract_codes_from_image(filepath: str) -> Dict[str, Any]:
     Returns:
         dict: {'qr_codes': [...], 'barcodes': [...], 'error': ...}
     """
-    result = {'qr_codes': [], 'barcodes': [], 'error': None}
+    result = {'qr_codes': [], 'barcodes': [], 'validation': [], 'error': None}
     try:
         image = cv2.imread(filepath)
         if image is None:
@@ -219,8 +219,17 @@ def extract_codes_from_image(filepath: str) -> Dict[str, Any]:
             result['error'] = 'Erro ao ler a imagem.'
             return result
         detected = decode(image)
-        result['qr_codes'] = [d.data.decode('utf-8') for d in detected if d.type == 'QRCODE']
-        result['barcodes'] = [d.data.decode('utf-8') for d in detected if d.type != 'QRCODE']
+        qr_codes = [d.data.decode('utf-8') for d in detected if d.type == 'QRCODE']
+        barcodes = [d.data.decode('utf-8') for d in detected if d.type != 'QRCODE']
+        result['qr_codes'] = qr_codes
+        result['barcodes'] = barcodes
+        # Validação usando validate_codes_in_database
+        all_codes = set(qr_codes + barcodes)
+        try:
+            validation = validate_codes_in_database(all_codes)
+            result['validation'] = validation
+        except Exception as e:
+            result['error'] = f'Erro ao validar códigos: {str(e)}'
     except Exception as e:
         result['error'] = f'Erro ao processar a imagem: {str(e)}'
     finally:
