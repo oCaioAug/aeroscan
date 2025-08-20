@@ -1,6 +1,6 @@
 import os
 import cv2
-from flask import send_from_directory
+from flask import send_from_directory, render_template
 import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -31,6 +31,12 @@ DB_USER = os.getenv('DB_USER', 'aeroscan_user')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'aeroscan_pass')
 
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+app.config['UPLOAD_FOLDER'] = 'uploads/'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
+
+# Ensure upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Configuração SQLAlchemy
 Base = declarative_base()
@@ -370,6 +376,41 @@ def listar_produtos():
 def camera_page():
     return send_from_directory('static', 'camera.html')
 
+
+# Corrigir rota para servir o template de imagem corretamente
+@app.route('/image', methods=['GET'])
+def imagem_page():
+    """
+    Endpoint para servir a página de upload/captura de imagem
+    """
+    return render_template('image.html')
+
+@app.route('/image/upload', methods=['POST'])
+def upload_image():
+    if 'image' not in request.files:
+        return render_template('image.html', error='Nenhum arquivo enviado.')
+    file = request.files['image']
+    if file.filename == '':
+        return render_template('image.html', error='Nome de arquivo vazio.')
+    try:
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        # Read image using OpenCV
+        image = cv2.imread(filepath)
+        if image is None:
+            os.remove(filepath)
+            return render_template('image.html', error='Erro ao ler a imagem.')
+        # Detect QR codes and barcodes
+        detected = decode(image)
+        qr_codes = [d.data.decode('utf-8') for d in detected if d.type == 'QRCODE']
+        barcodes = [d.data.decode('utf-8') for d in detected if d.type != 'QRCODE']
+        os.remove(filepath)  # Clean up uploaded file
+        return render_template('image.html', qr_codes=qr_codes, barcodes=barcodes)
+    except Exception as e:
+        return render_template('image.html', error='Erro ao processar a imagem.')
+
+
 @app.route('/api/processar_video', methods=['POST'])
 def processar_video():
     """
@@ -448,7 +489,7 @@ if __name__ == '__main__':
         logger.info("Iniciando Olho de Águia Backend...")
         
         # Inicializar banco de dados
-        init_database()
+        # init_database()
         
         # Configurar tamanho máximo de upload (100MB)
         app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
