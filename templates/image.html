@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Leitor de QR Code</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 500px; margin: auto; }
+        .result { margin-top: 20px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Leitor de QR Code</h2>
+        <form action="/image/upload" method="POST" enctype="multipart/form-data">
+            <label for="image">Escolha uma imagem com QR code ou código de barras:</label><br>
+            <input type="file" id="image" name="image" accept="image/*" required><br><br>
+            <input type="submit" value="Enviar">
+        </form>
+        {% if qr_codes is defined or barcodes is defined %}
+            <div class="result success">
+                <strong>Códigos encontrados:</strong>
+                {% if qr_codes and qr_codes|length > 0 %}
+                    <p><b>QR codes:</b></p>
+                    <ul>
+                        {% for code in qr_codes %}
+                            <li>{{ code }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if barcodes and barcodes|length > 0 %}
+                    <p><b>Códigos de barras:</b></p>
+                    <ul>
+                        {% for code in barcodes %}
+                            <li>{{ code }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if (not qr_codes or qr_codes|length == 0) and (not barcodes or barcodes|length == 0) %}
+                    <p>Nenhum código encontrado.</p>
+                {% endif %}
+            </div>
+        {% elif error is defined %}
+            <div class="result error">
+                <strong>{{ error }}</strong>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
