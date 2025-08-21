@@ -1,0 +1,189 @@
+<!-- Exemplo de página para configurar e visualizar a câmera do celular -->
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Configurar Câmera do Celular</title>
+  <style>
+      video { width: 100%; max-width: 400px; border: 1px solid #333; }
+      select { margin-top: 10px; }
+    </style>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+</head>
+<body>
+  <h2>Scanner de QR Code, Código de Barras e Câmera IP</h2>
+  <div>
+    <label>URL da Câmera IP (MJPEG):</label>
+    <input type="text" id="ipUrl" value="http://192.168.1.100:8080/video" style="width:300px;">
+    <button onclick="connectIpCamera()">Conectar</button>
+  </div>
+  <div class="container" style="display: flex; gap: 32px; align-items: flex-start;">
+    <div>
+      <select id="cameraSelect"></select><br>
+      <video id="video" autoplay playsinline style="display:none;"></video>
+      <img id="ipCamera" style="display:none; max-width:400px; border:1px solid #333;">
+  <canvas id="canvas"></canvas>
+      <div id="qrResult"></div>
+    </div>
+    <div>
+      <h3>Scaneamentos</h3>
+      <table id="scanTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Última Atualização</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    function connectIpCamera() {
+      const url = document.getElementById('ipUrl').value;
+      const ipCamera = document.getElementById('ipCamera');
+      ipCamera.src = url;
+      ipCamera.style.display = '';
+      video.style.display = 'none';
+    }
+    const video = document.getElementById('video');
+    const cameraSelect = document.getElementById('cameraSelect');
+    const canvas = document.getElementById('canvas');
+    const qrResult = document.getElementById('qrResult');
+    const scanTableBody = document.querySelector('#scanTable tbody');
+    const ctx = canvas.getContext('2d');
+    let currentStream;
+    let lastScanned = {};
+
+    async function getCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter(device => device.kind === 'videoinput');
+      cameraSelect.innerHTML = '';
+      cameras.forEach((camera, idx) => {
+        const option = document.createElement('option');
+        option.value = camera.deviceId;
+        option.text = camera.label || `Câmera ${idx + 1}`;
+        cameraSelect.appendChild(option);
+      });
+    }
+
+    async function startCamera(deviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      const constraints = { video: { deviceId: deviceId ? { exact: deviceId } : undefined } };
+      currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = currentStream;
+    }
+
+    cameraSelect.onchange = () => startCamera(cameraSelect.value);
+
+    function addScanToTable(id, tipo, status) {
+      let tr = document.getElementById('scan-' + id);
+      const now = new Date().toLocaleTimeString();
+      if (!tr) {
+        tr = document.createElement('tr');
+        tr.id = 'scan-' + id;
+        tr.innerHTML = `<td>${id}</td><td>${tipo}</td><td>${status}</td><td>${now}</td>`;
+        scanTableBody.prepend(tr);
+      } else {
+        tr.cells[2].innerText = status;
+        tr.cells[3].innerText = now;
+      }
+    }
+
+    async function scanQRCodeAndBarcode() {
+      // Escolhe a fonte do vídeo: ipCamera (MJPEG) ou video (webcam)
+      const ipCamera = document.getElementById('ipCamera');
+      let sourceElement = null;
+      if (ipCamera.style.display !== 'none' && ipCamera.src && ipCamera.complete) {
+        sourceElement = ipCamera;
+      } else if (video.style.display !== 'none' && currentStream) {
+        sourceElement = video;
+      }
+      if (!sourceElement) return;
+
+      // Reduz resolução para melhorar performance
+  const targetWidth = 320;
+  const targetHeight = 240;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      ctx.drawImage(sourceElement, 0, 0, targetWidth, targetHeight);
+      const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+
+      // QR Code
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      let qrText = '';
+      let barcodeText = '';
+      if (code && code.data) {
+        qrText = `QR Code detectado: ${code.data}`;
+        // Desenha retângulo vermelho
+        if (code.location) {
+          ctx.beginPath();
+          ctx.moveTo(code.location.topLeftCorner.x, code.location.topLeftCorner.y);
+          ctx.lineTo(code.location.topRightCorner.x, code.location.topRightCorner.y);
+          ctx.lineTo(code.location.bottomRightCorner.x, code.location.bottomRightCorner.y);
+          ctx.lineTo(code.location.bottomLeftCorner.x, code.location.bottomLeftCorner.y);
+          ctx.closePath();
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = "red";
+          ctx.stroke();
+        }
+        if (lastScanned[code.data] !== 'QR Code') {
+          addScanToTable(code.data, 'QR Code', 'Ok');
+          lastScanned[code.data] = 'QR Code';
+        }
+        qrResult.innerText = qrText;
+        return;
+      }
+
+      // Barcode (só se não achou QR code)
+      Quagga.decodeSingle({
+        src: canvas.toDataURL(),
+        numOfWorkers: 0,
+        inputStream: { size: 320 },
+        decoder: {
+          readers: [
+            "code_128_reader",
+            "ean_reader",
+            "ean_8_reader",
+            "code_39_reader",
+            "code_39_vin_reader",
+            "codabar_reader",
+            "upc_reader",
+            "upc_e_reader",
+            "i2of5_reader",
+            "2of5_reader",
+            "code_93_reader"
+          ]
+        }
+      }, function(result) {
+        if(result && result.codeResult) {
+          barcodeText = `Código de Barra detectado: ${result.codeResult.code}`;
+          if (lastScanned[result.codeResult.code] !== 'Código de Barra') {
+            addScanToTable(result.codeResult.code, 'Código de Barra', 'Ok');
+            lastScanned[result.codeResult.code] = 'Código de Barra';
+          }
+        } else {
+          barcodeText = 'Nenhum Código de Barra detectado';
+        }
+        qrResult.innerText = barcodeText;
+      });
+    }
+
+  // Aumenta intervalo para 3500ms para aliviar processamento
+  setInterval(scanQRCodeAndBarcode, 2000);
+
+    (async () => {
+      await getCameras();
+      if (cameraSelect.options.length > 0) {
+        await startCamera(cameraSelect.value);
+      }
+    })();
+  </script>
+</body>
+</html>

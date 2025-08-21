@@ -374,7 +374,7 @@ def listar_produtos():
 
 @app.route('/camera')
 def camera_page():
-    return send_from_directory('static', 'camera.html')
+    return render_template('camera.html')
 
 
 # Corrigir rota para servir o template de imagem corretamente
