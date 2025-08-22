@@ -1,55 +1,205 @@
-<!-- Exemplo de página para configurar e visualizar a câmera do celular -->
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Configurar Câmera do Celular</title>
-  <style>
-      video { width: 100%; max-width: 400px; border: 1px solid #333; }
-      select { margin-top: 10px; }
-    </style>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<meta name="description" content="Responsive Admin &amp; Dashboard Template based on Bootstrap 5">
+	<meta name="author" content="AdminKit">
+	<meta name="keywords" content="adminkit, bootstrap, bootstrap 5, admin, dashboard, template, responsive, css, sass, html, theme, front-end, ui kit, web">
+
+	<link rel="preconnect" href="https://fonts.gstatic.com">
+	<link rel="shortcut icon" href="img/icons/icon-48x48.png" />
+
+	<title>AeroScan - Controle de Câmera</title>
+
+	<link href="css/app.css" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+	<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+	<style>
+		video { width: 100%; max-width: 400px; border: 1px solid #333; }
+		select { margin-top: 10px; }
+		#scanTable { width: 100%; }
+		#scanTable th, #scanTable td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+	</style>
 </head>
+
 <body>
-  <h2>Scanner de QR Code, Código de Barras e Câmera IP</h2>
-  <div>
-    <label>URL da Câmera IP (MJPEG):</label>
-    <input type="text" id="ipUrl" value="http://192.168.1.100:8080/video" style="width:300px;">
-    <button onclick="connectIpCamera()">Conectar</button>
-  </div>
-  <div class="container" style="display: flex; gap: 32px; align-items: flex-start;">
-    <div>
-      <select id="cameraSelect"></select><br>
-      <video id="video" autoplay playsinline style="display:none;"></video>
-      <img id="ipCamera" style="display:none; max-width:400px; border:1px solid #333;">
-  <canvas id="canvas"></canvas>
-      <div id="qrResult"></div>
-    </div>
-    <div>
-      <h3>Scaneamentos</h3>
-      <table id="scanTable">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Tipo</th>
-            <th>Status</th>
-            <th>Última Atualização</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
+	<div class="wrapper">
+		<nav id="sidebar" class="sidebar js-sidebar">
+			<div class="sidebar-content js-simplebar">
+				<a class="sidebar-brand" href="index.html">
+                    <span class="align-middle">AeroScan</span>
+                </a>
+
+				<ul class="sidebar-nav">
+					<li class="sidebar-header">
+						Páginas
+					</li>
+
+					<li class="sidebar-item">
+						<a class="sidebar-link" href="dashboard.html">
+              <i class="align-middle" data-feather="sliders"></i> <span class="align-middle">Dashboard</span>
+            </a>
+					</li>
+
+					<li class="sidebar-item active">
+						<a class="sidebar-link" href="camera.html">
+              <i class="align-middle" data-feather="camera"></i> <span class="align-middle">Controle</span>
+            </a>
+					</li>
+
+					<li class="sidebar-item">
+						<a class="sidebar-link" href="/">
+              <i class="align-middle" data-feather="settings"></i> <span class="align-middle">Configurações</span>
+            </a>
+					</li>
+
+					<li class="sidebar-item">
+						<a class="sidebar-link" href="/">
+              <i class="align-middle" data-feather="user-minus"></i> <span class="align-middle">Sair</span>
+            </a>
+					</li>
+
+				</ul>
+			</div>
+		</nav>
+
+		<div class="main">
+			<nav class="navbar navbar-expand navbar-light navbar-bg">
+				<a class="sidebar-toggle js-sidebar-toggle">
+          <i class="hamburger align-self-center"></i>
+        </a>
+
+				<div class="navbar-collapse collapse">
+					<ul class="navbar-nav navbar-align">
+						<li class="nav-item dropdown">
+						</li>
+						<li class="nav-item dropdown">
+							<a class="nav-icon dropdown-toggle d-inline-block d-sm-none" href="#" data-bs-toggle="dropdown">
+                <i class="align-middle" data-feather="settings"></i>
+              </a>
+
+							<a class="nav-link dropdown-toggle d-none d-sm-inline-block" href="#" data-bs-toggle="dropdown">
+              </a>
+							<div class="dropdown-menu dropdown-menu-end">
+								<a class="dropdown-item" href="pages-profile.html"><i class="align-middle me-1" data-feather="user"></i> Perfil</a>
+								<a class="dropdown-item" href="#"><i class="align-middle me-1" data-feather="pie-chart"></i> Análise</a>
+								<div class="dropdown-divider"></div>
+								<a class="dropdown-item" href="index.html"><i class="align-middle me-1" data-feather="settings"></i> Configurações & Privacidade</a>
+								<a class="dropdown-item" href="#"><i class="align-middle me-1" data-feather="help-circle"></i> Central de Ajuda</a>
+								<div class="dropdown-divider"></div>
+								<a class="dropdown-item" href="#">Sair</a>
+							</div>
+						</li>
+					</ul>
+				</div>
+			</nav>
+
+			<main class="content">
+				<div class="container-fluid p-0">
+
+					<h1 class="h3 mb-3"><strong>Scanner de QR Code, Código de Barras e Câmera IP</strong></h1>
+					<div class="row">
+						<div class="col-12 col-lg-6">
+							<div class="card">
+								<div class="card-header">
+									<h5 class="card-title mb-0">Configuração da Câmera</h5>
+								</div>
+								<div class="card-body">
+									<div class="mb-3">
+										<label class="form-label">URL da Câmera IP (MJPEG):</label>
+										<div class="input-group">
+											<input type="text" class="form-control" id="ipUrl" value="http://192.168.1.100:8080/video">
+											<button class="btn btn-primary" onclick="connectIpCamera()">Conectar</button>
+										</div>
+									</div>
+									<div class="mb-3">
+										<label class="form-label">Selecionar Câmera:</label>
+										<select class="form-select" id="cameraSelect"></select>
+									</div>
+									<div class="text-center">
+										<video id="video" autoplay playsinline style="display:none; max-width: 100%; border: 1px solid #333;"></video>
+										<img id="ipCamera" style="display:none; max-width: 100%; border: 1px solid #333;">
+										<canvas id="canvas" style="max-width: 100%;"></canvas>
+									</div>
+									<div class="mt-3">
+										<div id="qrResult" class="alert alert-info" style="display: none;"></div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-12 col-lg-6">
+							<div class="card">
+								<div class="card-header">
+									<h5 class="card-title mb-0">Scaneamentos</h5>
+								</div>
+								<div class="card-body">
+									<div class="table-responsive">
+										<table class="table table-hover" id="scanTable">
+											<thead>
+												<tr>
+													<th>ID</th>
+													<th>Tipo</th>
+													<th>Status</th>
+													<th>Última Atualização</th>
+												</tr>
+											</thead>
+											<tbody></tbody>
+										</table>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+				</div>
+			</main>
+
+			<footer class="footer">
+				<div class="container-fluid">
+					<div class="row text-muted">
+						<div class="col-6 text-start">
+							<p class="mb-0">
+								<a class="text-muted" href="/" target="_blank"><strong>AeroScan</strong></a> - <a class="text-muted" href="/" target="_blank"><strong>Controle</strong></a>								&copy;
+							</p>
+						</div>
+						<div class="col-6 text-end">
+							<ul class="list-inline">
+								<li class="list-inline-item">
+									<a class="text-muted" href="/" target="_blank">Suporte</a>
+								</li>
+								<li class="list-inline-item">
+									<a class="text-muted" href="/" target="_blank">Privacidade</a>
+								</li>
+								<li class="list-inline-item">
+									<a class="text-muted" href="/" target="_blank">Termos</a>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			</footer>
+		</div>
+	</div>
+
+	<script src="js/app.js"></script>
 
   <script>
     function connectIpCamera() {
       const url = document.getElementById('ipUrl').value;
       const ipCamera = document.getElementById('ipCamera');
+      const qrResult = document.getElementById('qrResult');
       ipCamera.src = url;
       ipCamera.style.display = '';
       video.style.display = 'none';
+      qrResult.style.display = 'block';
+      qrResult.textContent = 'Conectando à câmera IP...';
+      qrResult.className = 'alert alert-info';
     }
+    
     const video = document.getElementById('video');
     const cameraSelect = document.getElementById('cameraSelect');
     const canvas = document.getElementById('canvas');
@@ -78,6 +228,8 @@
       const constraints = { video: { deviceId: deviceId ? { exact: deviceId } : undefined } };
       currentStream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = currentStream;
+      video.style.display = 'block';
+      document.getElementById('ipCamera').style.display = 'none';
     }
 
     cameraSelect.onchange = () => startCamera(cameraSelect.value);
@@ -88,10 +240,10 @@
       if (!tr) {
         tr = document.createElement('tr');
         tr.id = 'scan-' + id;
-        tr.innerHTML = `<td>${id}</td><td>${tipo}</td><td>${status}</td><td>${now}</td>`;
+        tr.innerHTML = `<td>${id}</td><td>${tipo}</td><td><span class="badge bg-success">${status}</span></td><td>${now}</td>`;
         scanTableBody.prepend(tr);
       } else {
-        tr.cells[2].innerText = status;
+        tr.cells[2].innerHTML = `<span class="badge bg-success">${status}</span>`;
         tr.cells[3].innerText = now;
       }
     }
@@ -108,8 +260,8 @@
       if (!sourceElement) return;
 
       // Reduz resolução para melhorar performance
-  const targetWidth = 320;
-  const targetHeight = 240;
+      const targetWidth = 320;
+      const targetHeight = 240;
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       ctx.drawImage(sourceElement, 0, 0, targetWidth, targetHeight);
@@ -137,7 +289,9 @@
           addScanToTable(code.data, 'QR Code', 'Ok');
           lastScanned[code.data] = 'QR Code';
         }
-        qrResult.innerText = qrText;
+        qrResult.style.display = 'block';
+        qrResult.textContent = qrText;
+        qrResult.className = 'alert alert-success';
         return;
       }
 
@@ -168,15 +322,19 @@
             addScanToTable(result.codeResult.code, 'Código de Barra', 'Ok');
             lastScanned[result.codeResult.code] = 'Código de Barra';
           }
+          qrResult.style.display = 'block';
+          qrResult.textContent = barcodeText;
+          qrResult.className = 'alert alert-success';
         } else {
-          barcodeText = 'Nenhum Código de Barra detectado';
+          qrResult.style.display = 'block';
+          qrResult.textContent = 'Aguardando detecção...';
+          qrResult.className = 'alert alert-warning';
         }
-        qrResult.innerText = barcodeText;
       });
     }
 
-  // Aumenta intervalo para 3500ms para aliviar processamento
-  setInterval(scanQRCodeAndBarcode, 2000);
+    // Aumenta intervalo para 2000ms para aliviar processamento
+    setInterval(scanQRCodeAndBarcode, 2000);
 
     (async () => {
       await getCameras();
@@ -185,5 +343,7 @@
       }
     })();
   </script>
+
 </body>
+
 </html>
