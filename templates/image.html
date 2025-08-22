@@ -2,181 +2,300 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Leitor de QR Code</title>
+    <title>Leitor de QR Code / Live</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; }
-        .container { max-width: 900px; margin: auto; }
-        .result { margin-top: 20px; }
-        .error { color: #b00020; }
-        .success { color: #1b5e20; }
-        .code-item { margin: 10px 0; padding: 12px; border-radius: 6px; display:flex; justify-content:space-between; align-items:center; }
-        .code-item.exists { background-color: #e8f5e9; border: 1px solid #c8e6c9; }
-        .code-item.not-exists { background-color: #ffebee; border: 1px solid #ffcdd2; }
-        .code-main { display:flex; flex-direction: column; }
-        .code-title { font-weight: 600; margin-bottom: 6px; word-break: break-all; }
-        .code-status { margin-left: 20px; font-weight: 600; }
-        .code-status.exists { color: #2e7d32; }
-        .code-status.not-exists { color: #c62828; }
-        .row { display:flex; gap:20px; }
-        .column { flex:1; }
-        .small { font-size: 0.9rem; color:#555; }
-        .messages { margin-top: 12px; padding: 12px; border-radius:6px; background:#e8f4f8; border: 1px solid #d0eaf5; }
-        .summary { margin-top:10px; padding:10px; border-radius:6px; background:#f3f3f3; }
-        .btn { padding:10px 14px; border-radius:6px; background:#1976d2; color:white; border:none; cursor:pointer; }
-        .btn.secondary { background:#4caf50; }
-        .btn.danger { background:#c62828; }
-        .report-box { margin-top: 16px; padding: 12px; border-radius: 6px; background: #fff8e1; border: 1px solid #ffe082; }
+        .container { max-width: 1100px; margin: auto; }
+        .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+        .small { font-size: .9rem; color: #555; }
+        .code-item { margin: 8px 0; padding: 8px; border-radius: 4px; }
+        .exists { background-color: #e8f5e9; }
+        .not-exists { background-color: #ffebee; }
+        .report { background: #f8f9fb; padding: 12px; border-radius:6px; margin-top:12px; }
+        #live-log { max-height: 240px; overflow:auto; border:1px solid #ddd; padding:8px; border-radius:6px; background:#fff; }
+        #live-status { margin-left: 12px; font-weight: bold; }
+        .status-ok { color: green; }
+        .status-fail { color: red; }
+        button { padding:6px 10px; }
+        #ronda-messages { margin-left: 12px; font-weight: normal; color:#333; }
+        #video { max-width: 640px; border: 1px solid #ccc; display:block; margin-top:12px; }
+        .preview-area { display:flex; gap:18px; align-items:flex-start; margin-top:10px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Leitor de QR Code / Barcode</h2>
+        <h2>Leitor de QR Code — Live (IP Camera)</h2>
 
-        <div class="row">
-            <div class="column">
-                <!-- Formulário de upload de imagem -->
-                <form action="/image/upload" method="POST" enctype="multipart/form-data">
-                    <label for="image">Escolha uma imagem com QR code ou código de barras:</label><br>
-                    <input type="file" id="image" name="image" accept="image/*" required><br><br>
-                    <input class="btn" type="submit" value="Enviar">
-                </form>
+        <div class="controls">
+            <label class="small">IP Camera URL:</label>
+            <input type="text" id="camera_url" placeholder="rtsp://user:pass@ip:554/stream ou http://...">
+            <button id="btn_start">Start Live</button>
+            <button id="btn_stop" disabled>Stop Live</button>
+            <span id="live-status" class="status-fail">Desconectado</span>
+
+            <button id="btn_start_ronda" style="margin-left:20px;">Começar (ronda)</button>
+            <button id="btn_end_ronda" style="margin-left:8px;">Encerrar (relatório)</button>
+            <span id="ronda-messages"></span>
+        </div>
+
+        <div class="preview-area">
+            <div style="flex:0 0 660px;">
+                <h4>Preview (live):</h4>
+                <!-- tente MJPEG (navegador) — fallback para polling /camera/frame.jpg -->
+                <img id="video" alt="Live video" src="" />
+                <div class="small">Se não aparecer, verifique a URL e se o servidor/câmera está acessível.</div>
             </div>
 
-            <div class="column">
-                <!-- Controles de ronda -->
-                <form action="/ronda/comecar" method="POST" style="display:inline">
-                    <button class="btn secondary" type="submit">Começar</button>
-                </form>
-
-                <form action="/ronda/encerrar" method="POST" style="display:inline; margin-left:10px;">
-                    <button class="btn danger" type="submit">Encerrar</button>
-                </form>
-
-                <div style="margin-top:10px;" class="small">
-                    <p><strong>Nota:</strong> "Começar" limpa o arquivo <code>codigos_encontrados.csv</code> para iniciar uma nova ronda.
-                    Ao enviar imagens durante a ronda, os códigos detectados são adicionados em <code>codigos_encontrados.csv</code>.
-                    Ao clicar em "Encerrar", o sistema compara os códigos encontrados com as caixas registradas e exibe um relatório.</p>
-                </div>
+            <div style="flex:1;">
+                <h4>Log de confirmações:</h4>
+                <div id="live-log"><em>Nenhuma confirmação ainda.</em></div>
             </div>
         </div>
 
-        <hr style="margin: 24px 0;">
+        <hr style="margin:18px 0;">
 
-        <!-- Área para mensagem de verificação (rota /verificar_caixa) -->
-        {% if mensagem_verificacao is defined %}
-            <div class="result {% if 'não' in mensagem_verificacao %}error{% else %}success{% endif %}">
-                {{ mensagem_verificacao }}
-            </div>
-        {% endif %}
+        <div id="report-area"></div>
 
-        <!-- Mensagens de processamento -->
-        {% if mensagens %}
-            <div class="messages">
-                <ul style="margin:0; padding-left:16px;">
-                    {% for m in mensagens %}
-                        <li>{{ m }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
-
-        <!-- Resultado do upload/processamento -->
-        {% if qr_codes is defined or barcodes is defined %}
-            <div class="result">
-                <strong>Códigos encontrados:</strong>
-                <div style="background-color: #fafafa; padding: 15px; border-radius: 5px; margin-top: 12px;">
-                    <h3>Resultado da Verificação</h3>
-
-                    <div class="summary small">
-                        <div>QR codes detectados: {{ qr_codes|length if qr_codes is defined else 0 }}</div>
-                        <div>Barcodes detectados: {{ barcodes|length if barcodes is defined else 0 }}</div>
-                    </div>
-
-                    {% if qr_codes and qr_codes|length > 0 %}
-                        <h4 style="margin-top:14px;">QR codes</h4>
-                        <ul style="list-style:none; padding:0;">
-                            {% for code in qr_codes %}
-                                {% set status = status_codigos|selectattr('codigo','equalto',code)|map(attribute='status')|first %}
-                                <li class="code-item {% if '✅' in status %}exists{% else %}not-exists{% endif %}">
-                                    <div class="code-main">
-                                        <div class="code-title"> {{ code }} </div>
-                                        <div class="small">Tipo: QR Code</div>
-                                    </div>
-                                    <div class="code-status {% if '✅' in status %}exists{% else %}not-exists{% endif %}">
-                                        {% if '✅' in status %}Já cadastrado{% else %}Não cadastrado{% endif %}
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-
-                    {% if barcodes and barcodes|length > 0 %}
-                        <h4 style="margin-top:14px;">Barcodes</h4>
-                        <ul style="list-style:none; padding:0;">
-                            {% for code in barcodes %}
-                                {% set status = status_codigos|selectattr('codigo','equalto',code)|map(attribute='status')|first %}
-                                <li class="code-item {% if '✅' in status %}exists{% else %}not-exists{% endif %}">
-                                    <div class="code-main">
-                                        <div class="code-title"> {{ code }} </div>
-                                        <div class="small">Tipo: Barcode</div>
-                                    </div>
-                                    <div class="code-status {% if '✅' in status %}exists{% else %}not-exists{% endif %}">
-                                        {% if '✅' in status %}Já cadastrado{% else %}Não cadastrado{% endif %}
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-
-                </div>
-            </div>
-        {% elif error is defined %}
-            <div class="result error">
-                <strong>{{ error }}</strong>
-            </div>
-        {% endif %}
-
-        <!-- Relatório da ronda (resultado de /ronda/encerrar) -->
-        {% if relatorio is defined %}
-            <div class="report-box">
-                <h3>Relatório da Ronda</h3>
-                <p>Total de códigos encontrados na ronda: <strong>{{ relatorio.total_found }}</strong></p>
-                <p>Total de códigos registrados (caixas): <strong>{{ relatorio.total_registered }}</strong></p>
-
-                <h4>Códigos encontrados NA RONDA que NÃO estão registrados</h4>
-                {% if relatorio.only_found and relatorio.only_found|length > 0 %}
-                    <ul>
-                        {% for c in relatorio.only_found %}
-                            <li style="color:#c62828;">{{ c }}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="small">Nenhum — todos os códigos encontrados estão registrados.</p>
-                {% endif %}
-
-                <h4>Códigos registrados que NÃO apareceram na ronda</h4>
-                {% if relatorio.only_registered and relatorio.only_registered|length > 0 %}
-                    <ul>
-                        {% for c in relatorio.only_registered %}
-                            <li style="color:#ff8f00;">{{ c }}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="small">Nenhum — todos os códigos registrados foram encontrados na ronda (ou não há registros).</p>
-                {% endif %}
-
-                <h4>Códigos em comum</h4>
-                {% if relatorio.common and relatorio.common|length > 0 %}
-                    <ul>
-                        {% for c in relatorio.common %}
-                            <li style="color:#2e7d32;">{{ c }}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="small">Nenhum código em comum.</p>
-                {% endif %}
-            </div>
-        {% endif %}
     </div>
+
+<script>
+(function(){
+    const btnStart = document.getElementById('btn_start');
+    const btnStop = document.getElementById('btn_stop');
+    const cameraUrlInput = document.getElementById('camera_url');
+    const liveLog = document.getElementById('live-log');
+    const liveStatus = document.getElementById('live-status');
+    const btnStartRonda = document.getElementById('btn_start_ronda');
+    const btnEndRonda = document.getElementById('btn_end_ronda');
+    const rondaMessages = document.getElementById('ronda-messages');
+    const reportArea = document.getElementById('report-area');
+    const videoImg = document.getElementById('video');
+
+    let pollInterval = null;       // for detections
+    let framePollInterval = null;  // fallback polling for /camera/frame.jpg
+
+    function appendLog(msg, cls) {
+        const now = new Date().toLocaleTimeString();
+        const el = document.createElement('div');
+        el.className = 'code-item ' + (cls || '');
+        el.innerHTML = `<strong>[${now}]</strong> ${msg}`;
+        if (liveLog.querySelector('em')) liveLog.innerHTML = '';
+        liveLog.prepend(el);
+    }
+
+    function setStatus(ok, text) {
+        liveStatus.textContent = text;
+        if (ok) {
+            liveStatus.classList.remove('status-fail');
+            liveStatus.classList.add('status-ok');
+        } else {
+            liveStatus.classList.remove('status-ok');
+            liveStatus.classList.add('status-fail');
+        }
+    }
+
+    async function startLive() {
+        const camera_url = cameraUrlInput.value.trim();
+        if (!camera_url) {
+            alert('Informe a URL da câmera ou defina CAMERA_URL no ambiente.');
+            return;
+        }
+        btnStart.disabled = true;
+        appendLog('Tentando conectar à câmera...', '');
+        try {
+            const resp = await fetch('/camera/live/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({camera_url})
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                appendLog('Captura iniciada: ' + (data.msg || ''), '');
+                setStatus(true, 'Conectado — Capturando...');
+                btnStop.disabled = false;
+                // iniciar polling para confirmações
+                if (!pollInterval) pollInterval = setInterval(pollDetections, 1500);
+                // tentar mostrar MJPEG primeiro; se erro, fallback para polling
+                startPreviewMJPEG();
+            } else {
+                appendLog('Falha ao conectar: ' + (data.msg || 'erro'), 'not-exists');
+                setStatus(false, 'Falha ao conectar');
+                btnStart.disabled = false;
+            }
+        } catch (e) {
+            appendLog('Erro ao chamar /camera/live/start: ' + e, 'not-exists');
+            setStatus(false, 'Erro de conexão');
+            btnStart.disabled = false;
+        }
+    }
+
+    async function stopLive() {
+        btnStop.disabled = true;
+        try {
+            const resp = await fetch('/camera/live/stop', { method: 'POST' });
+            const data = await resp.json();
+            if (data.ok) {
+                appendLog('Captura parada.', '');
+                setStatus(false, 'Parado');
+            } else {
+                appendLog('Falha ao parar captura.', 'not-exists');
+            }
+        } catch (e) {
+            appendLog('Erro ao chamar /camera/live/stop: ' + e, 'not-exists');
+        } finally {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+            stopFramePolling();
+            videoImg.src = '';
+            btnStart.disabled = false;
+        }
+    }
+
+    async function pollDetections() {
+        try {
+            const resp = await fetch('/camera/live/poll');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.ok && Array.isArray(data.detections) && data.detections.length > 0) {
+                data.detections.forEach(d => {
+                    const tipo = d.tipo || '';
+                    appendLog(`Código detectado: <b>${d.codigo}</b> (tipo: ${tipo}) — gravado em codigos_encontrados.csv`, 'exists');
+                });
+            }
+        } catch (e) {
+            console.debug('pollDetections error', e);
+        }
+    }
+
+    // ---------- Preview logic ----------
+    function startPreviewMJPEG() {
+        stopFramePolling(); // stop fallback while trying MJPEG
+        // try MJPEG endpoint first
+        videoImg.src = '/camera/mjpeg';
+        // if MJPEG errors (browser doesn't support or server not streaming), fallback
+        const onError = () => {
+            // fallback to polling JPEG endpoint
+            startFramePolling();
+        };
+        // attach once
+        videoImg.addEventListener('error', onError, {once: true});
+        // if after a short timeout there's no image loaded, fallback as well
+        setTimeout(() => {
+            if (!videoImg.naturalWidth) {
+                // try fallback
+                startFramePolling();
+            }
+        }, 1600);
+    }
+
+    function startFramePolling() {
+        if (framePollInterval) return;
+        videoImg.src = '/camera/frame.jpg?ts=' + Date.now();
+        framePollInterval = setInterval(() => {
+            videoImg.src = '/camera/frame.jpg?ts=' + Date.now();
+        }, 500);
+    }
+
+    function stopFramePolling() {
+        if (framePollInterval) {
+            clearInterval(framePollInterval);
+            framePollInterval = null;
+        }
+    }
+
+    // -------- Ronda (AJAX) --------
+    async function startRonda() {
+        btnStartRonda.disabled = true;
+        rondaMessages.textContent = 'Iniciando ronda...';
+        try {
+            const resp = await fetch('/ronda/comecar', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                rondaMessages.textContent = data.msg || 'Ronda iniciada.';
+                appendLog('Ronda iniciada — codigos_encontrados.csv limpo.', '');
+                // NÃO mexemos na captura: não paramos a câmera nem o polling.
+            } else {
+                rondaMessages.textContent = 'Falha ao iniciar ronda.';
+            }
+        } catch (e) {
+            rondaMessages.textContent = 'Erro ao iniciar ronda: ' + e;
+        } finally {
+            btnStartRonda.disabled = false;
+        }
+    }
+
+    function renderRelatorio(rel) {
+        const html = [];
+        html.push(`<div class="report"><h3>Relatório da Ronda</h3>`);
+        html.push(`<p><strong>Total encontrados na ronda:</strong> ${rel.total_found}</p>`);
+        html.push(`<p><strong>Total registrados no inventário:</strong> ${rel.total_registered}</p>`);
+        html.push(`<h4>Caixas completas:</h4><ul>`);
+        (rel.boxes_found || []).forEach(b => {
+            html.push(`<li>Caixa: ${JSON.stringify(b.codes)}</li>`);
+        });
+        html.push(`</ul><h4>Caixas parciais:</h4><ul>`);
+        (rel.boxes_partial || []).forEach(b => {
+            html.push(`<li>Presentes: ${JSON.stringify(b.codes_present)} | Faltando: ${JSON.stringify(b.codes_missing)}</li>`);
+        });
+        html.push(`</ul><h4>Caixas não encontradas:</h4><ul>`);
+        (rel.boxes_missing || []).forEach(b => {
+            html.push(`<li>Caixa: ${JSON.stringify(b.codes)}</li>`);
+        });
+        html.push(`</ul><h4>Códigos encontrados que não estão no inventário:</h4><pre>${JSON.stringify(rel.only_found)}</pre>`);
+        html.push(`</div>`);
+        reportArea.innerHTML = html.join('');
+    }
+
+    async function endRonda() {
+        btnEndRonda.disabled = true;
+        rondaMessages.textContent = 'Encerrando ronda (gerando relatório)...';
+        try {
+            const resp = await fetch('/ronda/encerrar', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await resp.json();
+            if (data.ok && data.relatorio) {
+                rondaMessages.textContent = 'Ronda encerrada — relatório pronto.';
+                renderRelatorio(data.relatorio);
+                appendLog('Ronda encerrada — relatório gerado.', '');
+            } else {
+                rondaMessages.textContent = 'Falha ao encerrar ronda.';
+            }
+        } catch (e) {
+            rondaMessages.textContent = 'Erro ao encerrar ronda: ' + e;
+        } finally {
+            btnEndRonda.disabled = false;
+        }
+    }
+
+    // event listeners
+    btnStart.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        startLive();
+    });
+
+    btnStop.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        stopLive();
+    });
+
+    btnStartRonda.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        startRonda();
+    });
+
+    btnEndRonda.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        endRonda();
+    });
+
+})();
+</script>
 </body>
 </html>
