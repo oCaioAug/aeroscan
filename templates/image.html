@@ -5,46 +5,176 @@
     <title>Leitor de QR Code</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; }
-        .container { max-width: 500px; margin: auto; }
+        .container { max-width: 900px; margin: auto; }
         .result { margin-top: 20px; }
-        .error { color: red; }
-        .success { color: green; }
+        .error { color: #b00020; }
+        .success { color: #1b5e20; }
+        .code-item { margin: 10px 0; padding: 12px; border-radius: 6px; display:flex; justify-content:space-between; align-items:center; }
+        .code-item.exists { background-color: #e8f5e9; border: 1px solid #c8e6c9; }
+        .code-item.not-exists { background-color: #ffebee; border: 1px solid #ffcdd2; }
+        .code-main { display:flex; flex-direction: column; }
+        .code-title { font-weight: 600; margin-bottom: 6px; word-break: break-all; }
+        .code-status { margin-left: 20px; font-weight: 600; }
+        .code-status.exists { color: #2e7d32; }
+        .code-status.not-exists { color: #c62828; }
+        .row { display:flex; gap:20px; }
+        .column { flex:1; }
+        .small { font-size: 0.9rem; color:#555; }
+        .messages { margin-top: 12px; padding: 12px; border-radius:6px; background:#e8f4f8; border: 1px solid #d0eaf5; }
+        .summary { margin-top:10px; padding:10px; border-radius:6px; background:#f3f3f3; }
+        .btn { padding:10px 14px; border-radius:6px; background:#1976d2; color:white; border:none; cursor:pointer; }
+        .btn.secondary { background:#4caf50; }
+        .btn.danger { background:#c62828; }
+        .report-box { margin-top: 16px; padding: 12px; border-radius: 6px; background: #fff8e1; border: 1px solid #ffe082; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Leitor de QR Code</h2>
-        <form action="/image/upload" method="POST" enctype="multipart/form-data">
-            <label for="image">Escolha uma imagem com QR code ou código de barras:</label><br>
-            <input type="file" id="image" name="image" accept="image/*" required><br><br>
-            <input type="submit" value="Enviar">
-        </form>
+        <h2>Leitor de QR Code / Barcode</h2>
+
+        <div class="row">
+            <div class="column">
+                <!-- Formulário de upload de imagem -->
+                <form action="/image/upload" method="POST" enctype="multipart/form-data">
+                    <label for="image">Escolha uma imagem com QR code ou código de barras:</label><br>
+                    <input type="file" id="image" name="image" accept="image/*" required><br><br>
+                    <input class="btn" type="submit" value="Enviar">
+                </form>
+            </div>
+
+            <div class="column">
+                <!-- Controles de ronda -->
+                <form action="/ronda/comecar" method="POST" style="display:inline">
+                    <button class="btn secondary" type="submit">Começar</button>
+                </form>
+
+                <form action="/ronda/encerrar" method="POST" style="display:inline; margin-left:10px;">
+                    <button class="btn danger" type="submit">Encerrar</button>
+                </form>
+
+                <div style="margin-top:10px;" class="small">
+                    <p><strong>Nota:</strong> "Começar" limpa o arquivo <code>codigos_encontrados.csv</code> para iniciar uma nova ronda.
+                    Ao enviar imagens durante a ronda, os códigos detectados são adicionados em <code>codigos_encontrados.csv</code>.
+                    Ao clicar em "Encerrar", o sistema compara os códigos encontrados com as caixas registradas e exibe um relatório.</p>
+                </div>
+            </div>
+        </div>
+
+        <hr style="margin: 24px 0;">
+
+        <!-- Área para mensagem de verificação (rota /verificar_caixa) -->
+        {% if mensagem_verificacao is defined %}
+            <div class="result {% if 'não' in mensagem_verificacao %}error{% else %}success{% endif %}">
+                {{ mensagem_verificacao }}
+            </div>
+        {% endif %}
+
+        <!-- Mensagens de processamento -->
+        {% if mensagens %}
+            <div class="messages">
+                <ul style="margin:0; padding-left:16px;">
+                    {% for m in mensagens %}
+                        <li>{{ m }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <!-- Resultado do upload/processamento -->
         {% if qr_codes is defined or barcodes is defined %}
-            <div class="result success">
+            <div class="result">
                 <strong>Códigos encontrados:</strong>
-                {% if qr_codes and qr_codes|length > 0 %}
-                    <p><b>QR codes:</b></p>
-                    <ul>
-                        {% for code in qr_codes %}
-                            <li>{{ code }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-                {% if barcodes and barcodes|length > 0 %}
-                    <p><b>Códigos de barras:</b></p>
-                    <ul>
-                        {% for code in barcodes %}
-                            <li>{{ code }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-                {% if (not qr_codes or qr_codes|length == 0) and (not barcodes or barcodes|length == 0) %}
-                    <p>Nenhum código encontrado.</p>
-                {% endif %}
+                <div style="background-color: #fafafa; padding: 15px; border-radius: 5px; margin-top: 12px;">
+                    <h3>Resultado da Verificação</h3>
+
+                    <div class="summary small">
+                        <div>QR codes detectados: {{ qr_codes|length if qr_codes is defined else 0 }}</div>
+                        <div>Barcodes detectados: {{ barcodes|length if barcodes is defined else 0 }}</div>
+                    </div>
+
+                    {% if qr_codes and qr_codes|length > 0 %}
+                        <h4 style="margin-top:14px;">QR codes</h4>
+                        <ul style="list-style:none; padding:0;">
+                            {% for code in qr_codes %}
+                                {% set status = status_codigos|selectattr('codigo','equalto',code)|map(attribute='status')|first %}
+                                <li class="code-item {% if '✅' in status %}exists{% else %}not-exists{% endif %}">
+                                    <div class="code-main">
+                                        <div class="code-title"> {{ code }} </div>
+                                        <div class="small">Tipo: QR Code</div>
+                                    </div>
+                                    <div class="code-status {% if '✅' in status %}exists{% else %}not-exists{% endif %}">
+                                        {% if '✅' in status %}Já cadastrado{% else %}Não cadastrado{% endif %}
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {% if barcodes and barcodes|length > 0 %}
+                        <h4 style="margin-top:14px;">Barcodes</h4>
+                        <ul style="list-style:none; padding:0;">
+                            {% for code in barcodes %}
+                                {% set status = status_codigos|selectattr('codigo','equalto',code)|map(attribute='status')|first %}
+                                <li class="code-item {% if '✅' in status %}exists{% else %}not-exists{% endif %}">
+                                    <div class="code-main">
+                                        <div class="code-title"> {{ code }} </div>
+                                        <div class="small">Tipo: Barcode</div>
+                                    </div>
+                                    <div class="code-status {% if '✅' in status %}exists{% else %}not-exists{% endif %}">
+                                        {% if '✅' in status %}Já cadastrado{% else %}Não cadastrado{% endif %}
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                </div>
             </div>
         {% elif error is defined %}
             <div class="result error">
                 <strong>{{ error }}</strong>
+            </div>
+        {% endif %}
+
+        <!-- Relatório da ronda (resultado de /ronda/encerrar) -->
+        {% if relatorio is defined %}
+            <div class="report-box">
+                <h3>Relatório da Ronda</h3>
+                <p>Total de códigos encontrados na ronda: <strong>{{ relatorio.total_found }}</strong></p>
+                <p>Total de códigos registrados (caixas): <strong>{{ relatorio.total_registered }}</strong></p>
+
+                <h4>Códigos encontrados NA RONDA que NÃO estão registrados</h4>
+                {% if relatorio.only_found and relatorio.only_found|length > 0 %}
+                    <ul>
+                        {% for c in relatorio.only_found %}
+                            <li style="color:#c62828;">{{ c }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="small">Nenhum — todos os códigos encontrados estão registrados.</p>
+                {% endif %}
+
+                <h4>Códigos registrados que NÃO apareceram na ronda</h4>
+                {% if relatorio.only_registered and relatorio.only_registered|length > 0 %}
+                    <ul>
+                        {% for c in relatorio.only_registered %}
+                            <li style="color:#ff8f00;">{{ c }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="small">Nenhum — todos os códigos registrados foram encontrados na ronda (ou não há registros).</p>
+                {% endif %}
+
+                <h4>Códigos em comum</h4>
+                {% if relatorio.common and relatorio.common|length > 0 %}
+                    <ul>
+                        {% for c in relatorio.common %}
+                            <li style="color:#2e7d32;">{{ c }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="small">Nenhum código em comum.</p>
+                {% endif %}
             </div>
         {% endif %}
     </div>
