@@ -40,13 +40,13 @@
 					</li>
 
 					<li class="sidebar-item">
-						<a class="sidebar-link" href="dashboard.html">
+						<a class="sidebar-link" href="dashboard">
               <i class="align-middle" data-feather="sliders"></i> <span class="align-middle">Dashboard</span>
             </a>
 					</li>
 
 					<li class="sidebar-item active">
-						<a class="sidebar-link" href="camera.html">
+						<a class="sidebar-link" href="camera">
               <i class="align-middle" data-feather="camera"></i> <span class="align-middle">Controle</span>
             </a>
 					</li>
@@ -106,44 +106,99 @@
 						<div class="col-12 col-lg-6">
 							<div class="card">
 								<div class="card-header">
-									<h5 class="card-title mb-0">Configuração da Câmera</h5>
+									<h5 class="card-title mb-0">Scanner em Tempo Real</h5>
 								</div>
 								<div class="card-body">
+									<div class="mb-3">
+										<div class="d-grid gap-2">
+											<button class="btn btn-success" id="startCameraBtn" onclick="requestCameraPermission()">
+												<i class="align-middle" data-feather="camera"></i>
+												Conectar Câmera do Dispositivo
+											</button>
+											<button class="btn btn-secondary" id="stopCameraBtn" onclick="stopCamera()" style="display: none;">
+												<i class="align-middle" data-feather="camera-off"></i>
+												Parar Câmera
+											</button>
+										</div>
+									</div>
+									<div class="mb-3" style="display: none;" id="cameraSelection">
+										<label class="form-label">Selecionar Câmera:</label>
+										<select class="form-select" id="cameraSelect"></select>
+									</div>
 									<div class="mb-3">
 										<label class="form-label">URL da Câmera IP (MJPEG):</label>
 										<div class="input-group">
 											<input type="text" class="form-control" id="ipUrl" value="http://192.168.1.100:8080/video">
-											<button class="btn btn-primary" onclick="connectIpCamera()">Conectar</button>
+											<button class="btn btn-outline-primary" onclick="connectIpCamera()">Conectar IP</button>
 										</div>
-									</div>
-									<div class="mb-3">
-										<label class="form-label">Selecionar Câmera:</label>
-										<select class="form-select" id="cameraSelect"></select>
 									</div>
 									<div class="text-center">
 										<video id="video" autoplay playsinline style="display:none; max-width: 100%; border: 1px solid #333;"></video>
-										<img id="ipCamera" style="display:none; max-width: 100%; border: 1px solid #333;">
-										<canvas id="canvas" style="max-width: 100%;"></canvas>
+										<img id="ipCamera" style="display:none; max-width: 100%; border: 1px solid #333;" crossorigin="anonymous">
+										<canvas id="canvas" style="max-width: 100%; border: 2px solid #007bff; border-radius: 8px;"></canvas>
+										<div class="mt-2">
+											<small class="text-muted">
+												<i class="align-middle" data-feather="info"></i>
+												Canvas de detecção - QR codes aparecerão com retângulo vermelho
+											</small>
+										</div>
 									</div>
 									<div class="mt-3">
 										<div id="qrResult" class="alert alert-info" style="display: none;"></div>
+									</div>
+									<div class="mt-3">
+										<div id="cameraStatus" class="alert alert-warning">
+											<i class="align-middle" data-feather="info"></i>
+											Clique em "Conectar Câmera" para iniciar o scanner
+										</div>
 									</div>
 								</div>
 							</div>
 						</div>
 						<div class="col-12 col-lg-6">
+							<div class="card mb-3">
+								<div class="card-header">
+									<h5 class="card-title mb-0">Upload de Vídeo</h5>
+								</div>
+								<div class="card-body">
+									<div class="mb-3">
+										<label class="form-label">Selecionar arquivo de vídeo:</label>
+										<input type="file" class="form-control" id="videoFile" accept="video/*">
+									</div>
+									<div class="d-grid">
+										<button class="btn btn-primary" onclick="uploadAndProcessVideo()" id="uploadBtn">
+											<i class="align-middle" data-feather="upload"></i>
+											Processar Vídeo
+										</button>
+									</div>
+									<div class="mt-3">
+										<div id="uploadProgress" style="display: none;">
+											<div class="progress">
+												<div class="progress-bar" role="progressbar" style="width: 0%"></div>
+											</div>
+											<small class="text-muted mt-1 d-block">Processando vídeo...</small>
+										</div>
+									</div>
+									<div class="mt-3">
+										<div id="uploadResult" style="display: none;"></div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-12">
 							<div class="card">
 								<div class="card-header">
-									<h5 class="card-title mb-0">Scaneamentos</h5>
+									<h5 class="card-title mb-0">Resultados dos Scaneamentos</h5>
 								</div>
 								<div class="card-body">
 									<div class="table-responsive">
 										<table class="table table-hover" id="scanTable">
 											<thead>
 												<tr>
-													<th>ID</th>
+													<th>Código</th>
 													<th>Tipo</th>
 													<th>Status</th>
+													<th>Origem</th>
 													<th>Última Atualização</th>
 												</tr>
 											</thead>
@@ -186,33 +241,148 @@
 	</div>
 
 	<script src="js/app.js"></script>
+	<script src="https://unpkg.com/feather-icons"></script>
+	<script>
+		// Inicializar ícones Feather
+		feather.replace();
+	</script>
 
   <script>
-    function connectIpCamera() {
-      const url = document.getElementById('ipUrl').value;
-      const ipCamera = document.getElementById('ipCamera');
-      const qrResult = document.getElementById('qrResult');
-      ipCamera.src = url;
-      ipCamera.style.display = '';
-      video.style.display = 'none';
-      qrResult.style.display = 'block';
-      qrResult.textContent = 'Conectando à câmera IP...';
-      qrResult.className = 'alert alert-info';
-    }
-    
+    // Variáveis globais
     const video = document.getElementById('video');
     const cameraSelect = document.getElementById('cameraSelect');
     const canvas = document.getElementById('canvas');
     const qrResult = document.getElementById('qrResult');
+    const cameraStatus = document.getElementById('cameraStatus');
     const scanTableBody = document.querySelector('#scanTable tbody');
     const ctx = canvas.getContext('2d');
     let currentStream;
     let lastScanned = {};
+    let scanningInterval;
+
+    // Função para solicitar permissão da câmera
+    async function requestCameraPermission() {
+      try {
+        cameraStatus.textContent = 'Solicitando permissão da câmera...';
+        cameraStatus.className = 'alert alert-info';
+        
+        await getCameras();
+        if (cameraSelect.options.length > 0) {
+          await startCamera(cameraSelect.value);
+          document.getElementById('startCameraBtn').style.display = 'none';
+          document.getElementById('stopCameraBtn').style.display = 'block';
+          document.getElementById('cameraSelection').style.display = 'block';
+          
+          cameraStatus.textContent = 'Câmera conectada! Scanner ativo.';
+          cameraStatus.className = 'alert alert-success';
+          
+          // Iniciar scanner automático
+          startScanning();
+        } else {
+          throw new Error('Nenhuma câmera encontrada');
+        }
+      } catch (error) {
+        console.error('Erro ao acessar câmera:', error);
+        cameraStatus.textContent = 'Erro ao acessar câmera: ' + error.message;
+        cameraStatus.className = 'alert alert-danger';
+      }
+    }
+
+    // Função para parar a câmera
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+      }
+      
+      if (scanningInterval) {
+        clearInterval(scanningInterval);
+        scanningInterval = null;
+      }
+      
+      video.style.display = 'none';
+      document.getElementById('ipCamera').style.display = 'none';
+      document.getElementById('startCameraBtn').style.display = 'block';
+      document.getElementById('stopCameraBtn').style.display = 'none';
+      document.getElementById('cameraSelection').style.display = 'none';
+      
+      cameraStatus.textContent = 'Câmera desconectada. Clique em "Conectar Câmera" para reiniciar.';
+      cameraStatus.className = 'alert alert-warning';
+      
+      qrResult.style.display = 'none';
+    }
+
+    // Função para iniciar o scanning automático
+    function startScanning() {
+      if (scanningInterval) {
+        clearInterval(scanningInterval);
+      }
+      console.log('Iniciando scanner automático...');
+      // Usar intervalo maior para reduzir carga de processamento
+      scanningInterval = setInterval(scanQRCodeAndBarcode, 1000);
+    }
+
+    function connectIpCamera() {
+      const url = document.getElementById('ipUrl').value;
+      const ipCamera = document.getElementById('ipCamera');
+      
+      // Parar câmera atual se estiver ativa
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+      }
+      
+      // Parar scanner se estiver ativo
+      if (scanningInterval) {
+        clearInterval(scanningInterval);
+        scanningInterval = null;
+      }
+      
+      ipCamera.src = url;
+      ipCamera.style.display = 'block';
+      video.style.display = 'none';
+      
+      cameraStatus.textContent = 'Conectando à câmera IP...';
+      cameraStatus.className = 'alert alert-info';
+      
+      let scannerStarted = false;
+      
+      ipCamera.onload = function() {
+        if (!scannerStarted) {
+          cameraStatus.textContent = 'Câmera IP conectada! Scanner ativo.';
+          cameraStatus.className = 'alert alert-success';
+          console.log('Câmera IP carregada, iniciando scanner...');
+          startScanning();
+          scannerStarted = true;
+        }
+      };
+      
+      ipCamera.onerror = function() {
+        cameraStatus.textContent = 'Erro ao conectar câmera IP. Verifique a URL.';
+        cameraStatus.className = 'alert alert-danger';
+      };
+      
+      // Fallback para casos onde onload não é chamado
+      setTimeout(() => {
+        if (!scannerStarted && ipCamera.naturalWidth > 0 && ipCamera.naturalHeight > 0) {
+          console.log('Dimensões da câmera IP:', ipCamera.naturalWidth, 'x', ipCamera.naturalHeight);
+          cameraStatus.textContent = 'Câmera IP conectada! Scanner ativo.';
+          cameraStatus.className = 'alert alert-success';
+          startScanning();
+          scannerStarted = true;
+        }
+      }, 3000);
+    }
 
     async function getCameras() {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const cameras = devices.filter(device => device.kind === 'videoinput');
       cameraSelect.innerHTML = '';
+      
+      if (cameras.length === 0) {
+        throw new Error('Nenhuma câmera encontrada no dispositivo');
+      }
+      
       cameras.forEach((camera, idx) => {
         const option = document.createElement('option');
         option.value = camera.deviceId;
@@ -225,123 +395,284 @@
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
       }
-      const constraints = { video: { deviceId: deviceId ? { exact: deviceId } : undefined } };
+      
+      const constraints = { 
+        video: { 
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      };
+      
       currentStream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = currentStream;
       video.style.display = 'block';
       document.getElementById('ipCamera').style.display = 'none';
     }
 
-    cameraSelect.onchange = () => startCamera(cameraSelect.value);
+    cameraSelect.onchange = () => {
+      if (currentStream) {
+        startCamera(cameraSelect.value);
+      }
+    };
 
-    function addScanToTable(id, tipo, status) {
+    function addScanToTable(id, tipo, status, origem = 'Câmera') {
       let tr = document.getElementById('scan-' + id);
       const now = new Date().toLocaleTimeString();
+      
       if (!tr) {
         tr = document.createElement('tr');
         tr.id = 'scan-' + id;
-        tr.innerHTML = `<td>${id}</td><td>${tipo}</td><td><span class="badge bg-success">${status}</span></td><td>${now}</td>`;
+        const statusClass = status === 'Ok' ? 'bg-success' : 'bg-danger';
+        tr.innerHTML = `
+          <td>${id}</td>
+          <td>${tipo}</td>
+          <td><span class="badge ${statusClass}">${status}</span></td>
+          <td>${origem}</td>
+          <td>${now}</td>
+        `;
         scanTableBody.prepend(tr);
       } else {
-        tr.cells[2].innerHTML = `<span class="badge bg-success">${status}</span>`;
-        tr.cells[3].innerText = now;
+        const statusClass = status === 'Ok' ? 'bg-success' : 'bg-danger';
+        tr.cells[2].innerHTML = `<span class="badge ${statusClass}">${status}</span>`;
+        tr.cells[3].innerText = origem;
+        tr.cells[4].innerText = now;
       }
     }
 
     async function scanQRCodeAndBarcode() {
-      // Escolhe a fonte do vídeo: ipCamera (MJPEG) ou video (webcam)
       const ipCamera = document.getElementById('ipCamera');
       let sourceElement = null;
-      if (ipCamera.style.display !== 'none' && ipCamera.src && ipCamera.complete) {
-        sourceElement = ipCamera;
+      
+      // Verificar qual fonte de vídeo está ativa
+      if (ipCamera.style.display !== 'none' && ipCamera.src) {
+        // Para câmera IP, verificar se a imagem está carregada
+        if (ipCamera.complete && ipCamera.naturalWidth > 0) {
+          sourceElement = ipCamera;
+        }
       } else if (video.style.display !== 'none' && currentStream) {
         sourceElement = video;
       }
-      if (!sourceElement) return;
-
-      // Reduz resolução para melhorar performance
-      const targetWidth = 320;
-      const targetHeight = 240;
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      ctx.drawImage(sourceElement, 0, 0, targetWidth, targetHeight);
-      const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
-
-      // QR Code
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
-      let qrText = '';
-      let barcodeText = '';
-      if (code && code.data) {
-        qrText = `QR Code detectado: ${code.data}`;
-        // Desenha retângulo vermelho
-        if (code.location) {
-          ctx.beginPath();
-          ctx.moveTo(code.location.topLeftCorner.x, code.location.topLeftCorner.y);
-          ctx.lineTo(code.location.topRightCorner.x, code.location.topRightCorner.y);
-          ctx.lineTo(code.location.bottomRightCorner.x, code.location.bottomRightCorner.y);
-          ctx.lineTo(code.location.bottomLeftCorner.x, code.location.bottomLeftCorner.y);
-          ctx.closePath();
-          ctx.lineWidth = 4;
-          ctx.strokeStyle = "red";
-          ctx.stroke();
-        }
-        if (lastScanned[code.data] !== 'QR Code') {
-          addScanToTable(code.data, 'QR Code', 'Ok');
-          lastScanned[code.data] = 'QR Code';
-        }
-        qrResult.style.display = 'block';
-        qrResult.textContent = qrText;
-        qrResult.className = 'alert alert-success';
+      
+      if (!sourceElement) {
         return;
       }
 
-      // Barcode (só se não achou QR code)
-      Quagga.decodeSingle({
-        src: canvas.toDataURL(),
-        numOfWorkers: 0,
-        inputStream: { size: 320 },
-        decoder: {
-          readers: [
-            "code_128_reader",
-            "ean_reader",
-            "ean_8_reader",
-            "code_39_reader",
-            "code_39_vin_reader",
-            "codabar_reader",
-            "upc_reader",
-            "upc_e_reader",
-            "i2of5_reader",
-            "2of5_reader",
-            "code_93_reader"
-          ]
-        }
-      }, function(result) {
-        if(result && result.codeResult) {
-          barcodeText = `Código de Barra detectado: ${result.codeResult.code}`;
-          if (lastScanned[result.codeResult.code] !== 'Código de Barra') {
-            addScanToTable(result.codeResult.code, 'Código de Barra', 'Ok');
-            lastScanned[result.codeResult.code] = 'Código de Barra';
+      // Configurar canvas com dimensões adequadas
+      const targetWidth = 640;
+      const targetHeight = 480;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      
+      // Limpar canvas anterior
+      ctx.clearRect(0, 0, targetWidth, targetHeight);
+      
+      try {
+        // Desenhar a imagem no canvas
+        ctx.drawImage(sourceElement, 0, 0, targetWidth, targetHeight);
+        const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+
+        // Tentar detectar QR Code
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+        
+        if (code && code.data) {
+          const qrText = `QR Code: ${code.data}`;
+          console.log('QR Code detectado:', code.data);
+          
+          // Desenhar retângulo de detecção MAIS VISÍVEL
+          if (code.location) {
+            // Retângulo vermelho grosso
+            ctx.beginPath();
+            ctx.moveTo(code.location.topLeftCorner.x, code.location.topLeftCorner.y);
+            ctx.lineTo(code.location.topRightCorner.x, code.location.topRightCorner.y);
+            ctx.lineTo(code.location.bottomRightCorner.x, code.location.bottomRightCorner.y);
+            ctx.lineTo(code.location.bottomLeftCorner.x, code.location.bottomLeftCorner.y);
+            ctx.closePath();
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = "#FF0000";
+            ctx.stroke();
+            
+            // Adicionar sombra/borda para destacar mais
+            ctx.beginPath();
+            ctx.moveTo(code.location.topLeftCorner.x-2, code.location.topLeftCorner.y-2);
+            ctx.lineTo(code.location.topRightCorner.x+2, code.location.topRightCorner.y-2);
+            ctx.lineTo(code.location.bottomRightCorner.x+2, code.location.bottomRightCorner.y+2);
+            ctx.lineTo(code.location.bottomLeftCorner.x-2, code.location.bottomLeftCorner.y+2);
+            ctx.closePath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.stroke();
+            
+            // Adicionar texto identificando o QR code
+            ctx.fillStyle = "#FF0000";
+            ctx.font = "bold 20px Arial";
+            ctx.fillText("QR CODE", code.location.topLeftCorner.x, code.location.topLeftCorner.y - 10);
           }
+          
+          if (lastScanned[code.data] !== 'QR Code') {
+            addScanToTable(code.data, 'QR Code', 'Ok', sourceElement === ipCamera ? 'Câmera IP' : 'Câmera ao Vivo');
+            lastScanned[code.data] = 'QR Code';
+          }
+          
           qrResult.style.display = 'block';
-          qrResult.textContent = barcodeText;
+          qrResult.textContent = qrText;
           qrResult.className = 'alert alert-success';
-        } else {
-          qrResult.style.display = 'block';
-          qrResult.textContent = 'Aguardando detecção...';
-          qrResult.className = 'alert alert-warning';
+          return;
         }
-      });
+
+        // Se não encontrou QR code, tentar código de barras (apenas ocasionalmente para não sobrecarregar)
+        if (Math.random() < 0.3) { // 30% de chance para reduzir carga
+          Quagga.decodeSingle({
+            src: canvas.toDataURL(),
+            numOfWorkers: 0,
+            inputStream: { 
+              size: 640,
+              type: "LiveStream"
+            },
+            decoder: {
+              readers: [
+                "code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader",
+                "code_39_vin_reader", "codabar_reader", "upc_reader", "upc_e_reader",
+                "i2of5_reader", "2of5_reader", "code_93_reader"
+              ]
+            }
+          }, function(result) {
+            if(result && result.codeResult) {
+              const barcodeText = `Código de Barras: ${result.codeResult.code}`;
+              console.log('Código de barras detectado:', result.codeResult.code);
+              
+              // Desenhar retângulo para código de barras
+              if (result.codeResult.start && result.codeResult.end) {
+                ctx.beginPath();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = "#00FF00";
+                ctx.rect(result.codeResult.start.x - 10, result.codeResult.start.y - 10, 
+                        (result.codeResult.end.x - result.codeResult.start.x) + 20, 20);
+                ctx.stroke();
+                
+                ctx.fillStyle = "#00FF00";
+                ctx.font = "bold 16px Arial";
+                ctx.fillText("BARCODE", result.codeResult.start.x, result.codeResult.start.y - 15);
+              }
+              
+              if (lastScanned[result.codeResult.code] !== 'Código de Barras') {
+                addScanToTable(result.codeResult.code, 'Código de Barras', 'Ok', sourceElement === ipCamera ? 'Câmera IP' : 'Câmera ao Vivo');
+                lastScanned[result.codeResult.code] = 'Código de Barras';
+              }
+              
+              qrResult.style.display = 'block';
+              qrResult.textContent = barcodeText;
+              qrResult.className = 'alert alert-success';
+            }
+          });
+        } else {
+          // Mostrar status de aguardando apenas se não há resultado anterior
+          if (!qrResult.style.display || qrResult.style.display === 'none') {
+            qrResult.style.display = 'block';
+            qrResult.textContent = 'Aguardando detecção...';
+            qrResult.className = 'alert alert-warning';
+          }
+        }
+        
+      } catch (error) {
+        console.error('Erro durante o scanning:', error);
+      }
     }
 
-    // Aumenta intervalo para 2000ms para aliviar processamento
-    setInterval(scanQRCodeAndBarcode, 2000);
-
-    (async () => {
-      await getCameras();
-      if (cameraSelect.options.length > 0) {
-        await startCamera(cameraSelect.value);
+    // Função para upload e processamento de vídeo
+    async function uploadAndProcessVideo() {
+      const fileInput = document.getElementById('videoFile');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const progressDiv = document.getElementById('uploadProgress');
+      const resultDiv = document.getElementById('uploadResult');
+      
+      if (!fileInput.files[0]) {
+        alert('Por favor, selecione um arquivo de vídeo');
+        return;
       }
-    })();
+      
+      const file = fileInput.files[0];
+      
+      // Verificar tipo de arquivo
+      if (!file.type.startsWith('video/')) {
+        alert('Por favor, selecione um arquivo de vídeo válido');
+        return;
+      }
+      
+      // Verificar tamanho (100MB máximo)
+      if (file.size > 100 * 1024 * 1024) {
+        alert('Arquivo muito grande. Tamanho máximo: 100MB');
+        return;
+      }
+      
+      uploadBtn.disabled = true;
+      progressDiv.style.display = 'block';
+      resultDiv.style.display = 'none';
+      
+      const formData = new FormData();
+      formData.append('video', file);
+      
+      try {
+        const response = await fetch('/api/processar_video', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          // Sucesso
+          resultDiv.innerHTML = `
+            <div class="alert alert-success">
+              <h6><i class="align-middle" data-feather="check-circle"></i> Processamento Concluído!</h6>
+              <p><strong>Códigos encontrados:</strong> ${result.codes_found}</p>
+              <p><strong>Sucessos:</strong> ${result.success_count} | <strong>Erros:</strong> ${result.error_count}</p>
+            </div>
+          `;
+          
+          // Adicionar resultados à tabela
+          if (result.results && result.results.length > 0) {
+            result.results.forEach(item => {
+              const status = item.status.includes('✅') ? 'Ok' : 'Erro';
+              addScanToTable(item.codigo, 'QR/Barcode', status, 'Upload de Vídeo');
+            });
+          }
+          
+        } else {
+          // Erro
+          resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+              <h6><i class="align-middle" data-feather="alert-circle"></i> Erro no Processamento</h6>
+              <p>${result.erro || 'Erro desconhecido'}</p>
+            </div>
+          `;
+        }
+        
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <div class="alert alert-danger">
+            <h6><i class="align-middle" data-feather="wifi-off"></i> Erro de Conexão</h6>
+            <p>Não foi possível conectar ao servidor: ${error.message}</p>
+          </div>
+        `;
+      } finally {
+        uploadBtn.disabled = false;
+        progressDiv.style.display = 'none';
+        resultDiv.style.display = 'block';
+      }
+    }
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', function() {
+      // Verificar se há suporte a getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        cameraStatus.textContent = 'Seu navegador não suporta acesso à câmera';
+        cameraStatus.className = 'alert alert-danger';
+        document.getElementById('startCameraBtn').disabled = true;
+      }
+    });
   </script>
 
 </body>

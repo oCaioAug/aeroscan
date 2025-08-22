@@ -376,6 +376,30 @@ def listar_produtos():
 def camera_page():
     return render_template('camera.html')
 
+@app.route('/dashboard')
+def dashboard_page():
+    return render_template('dashboard.html')
+
+# Rotas para servir arquivos estáticos
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    """Serve arquivos CSS"""
+    return send_from_directory('templates/css', filename)
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    """Serve arquivos JavaScript"""
+    return send_from_directory('templates/js', filename)
+
+@app.route('/img/<path:filename>')
+def serve_images(filename):
+    """Serve arquivos de imagem"""
+    return send_from_directory('templates/img', filename)
+
+@app.route('/img/icons/<path:filename>')
+def serve_icons(filename):
+    """Serve ícones"""
+    return send_from_directory('templates/img/icons', filename)
 
 # Corrigir rota para servir o template de imagem corretamente
 @app.route('/image', methods=['GET'])
