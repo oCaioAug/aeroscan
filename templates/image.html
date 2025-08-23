@@ -4,22 +4,173 @@
     <meta charset="UTF-8">
     <title>Leitor de QR Code / Live</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        .container { max-width: 1100px; margin: auto; }
-        .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-        .small { font-size: .9rem; color: #555; }
-        .code-item { margin: 8px 0; padding: 8px; border-radius: 4px; }
-        .exists { background-color: #e8f5e9; }
-        .not-exists { background-color: #ffebee; }
-        .report { background: #f8f9fb; padding: 12px; border-radius:6px; margin-top:12px; }
-        #live-log { max-height: 240px; overflow:auto; border:1px solid #ddd; padding:8px; border-radius:6px; background:#fff; }
-        #live-status { margin-left: 12px; font-weight: bold; }
-        .status-ok { color: green; }
-        .status-fail { color: red; }
-        button { padding:6px 10px; }
-        #ronda-messages { margin-left: 12px; font-weight: normal; color:#333; }
-        #video { max-width: 640px; border: 1px solid #ccc; display:block; margin-top:12px; }
+        /* Minimalista, discreto e funcional */
+        :root{
+            --bg: #f6f8fa;
+            --card: #ffffff;
+            --muted: #6b7280;
+            --border: #e6e9ed;
+            --text: #0f1720;
+            --accent: #3b82f6;
+            --success: #16a34a;
+            --danger: #ef4444;
+            --warn: #f97316;
+            --glass: rgba(15,23,32,0.04);
+            --radius: 8px;
+        }
+
+        html,body{height:100%;}
+        body {
+            font-family: "Inter", Arial, sans-serif;
+            margin: 40px;
+            background: var(--bg);
+            color: var(--text);
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
+            line-height:1.4;
+        }
+
+        .container { 
+            max-width: 1100px; 
+            margin: auto; 
+        }
+
+        h2 {
+            margin: 0 0 12px 0;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .controls {
+            display:flex;
+            gap:12px;
+            align-items:center;
+            flex-wrap:wrap;
+            margin-bottom:12px;
+            background: transparent;
+        }
+
+        label.small { 
+            font-size: .9rem; 
+            color: var(--muted); 
+            margin-right:6px;
+        }
+
+        input[type="text"] {
+            padding:8px 10px;
+            border:1px solid var(--border);
+            background: var(--card);
+            border-radius:6px;
+            outline: none;
+            min-width: 340px;
+            box-shadow: 0 1px 0 var(--glass);
+            font-size: .95rem;
+        }
+        input[type="text"]::placeholder { color: #9aa4b2; }
+
+        /* botões - estilo base */
+        button {
+            padding:7px 12px;
+            border-radius: 8px;
+            border: 0;
+            font-weight:600;
+            font-size: .95rem;
+            cursor: pointer;
+            box-shadow: 0 1px 0 rgba(2,6,23,0.04);
+            transition: transform .06s ease, box-shadow .08s ease, opacity .12s ease;
+        }
+        button:active{ transform: translateY(1px); }
+        button:disabled{ cursor: default; opacity: .6; transform:none; }
+
+        /* cores funcionais, discretas */
+        #btn_start {
+            background: linear-gradient(180deg,var(--success), #0ea05a);
+            color: white;
+        }
+        #btn_stop {
+            background: linear-gradient(180deg,var(--danger), #e23d3d);
+            color: white;
+        }
+        #btn_start_ronda {
+            background: linear-gradient(180deg,var(--accent), #2563eb);
+            color: white;
+        }
+        #btn_end_ronda {
+            background: linear-gradient(180deg,var(--warn), #f97316);
+            color: white;
+        }
+
+        /* status */
+        #live-status {
+            margin-left: 12px;
+            font-weight: 700;
+            color: #c0262f; /* vermelho suave por padrão */
+            font-size: .95rem;
+        }
+        .status-ok { color: var(--success); }
+        .status-fail { color: #c0262f; }
+
+        /* preview e log */
         .preview-area { display:flex; gap:18px; align-items:flex-start; margin-top:10px; }
+        #video {
+            max-width: 640px;
+            border-radius: 8px;
+            display:block;
+            margin-top:12px;
+            background:#000;
+            min-height: 360px;
+            object-fit:contain;
+            border:1px solid var(--border);
+            box-shadow: 0 6px 18px rgba(12,18,26,0.04);
+        }
+
+        .container-abaixo {
+            margin-top:8px;
+            display:flex;
+            gap:8px;
+            align-items:center;
+        }
+
+        h4 {
+            margin:0 0 8px 0;
+            font-size:1rem;
+            color:var(--text);
+        }
+
+        #live-log {
+            max-height: 240px;
+            overflow:auto;
+            border:1px solid var(--border);
+            padding:10px;
+            border-radius:8px;
+            background: var(--card);
+            font-size:.95rem;
+            color:var(--text);
+            box-shadow: 0 1px 0 var(--glass);
+        }
+
+        .code-item {
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 6px;
+            background: #fff;
+            border:1px solid rgba(0,0,0,0.03);
+            font-size: .95rem;
+        }
+        .exists { background-color: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.12); }
+        .not-exists { background-color: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.12); }
+
+        .report { background: #fff; padding: 12px; border-radius:8px; margin-top:12px; border:1px solid var(--border); }
+
+        #ronda-messages { margin-left: 12px; font-weight: normal; color: var(--muted); }
+
+        /* responsividade simples */
+        @media (max-width:880px){
+            .preview-area { flex-direction:column; }
+            #video{ width:100%; max-width:100%; min-height:240px; }
+            input[type="text"]{ min-width:180px; width:calc(100% - 300px); }
+        }
     </style>
 </head>
 <body>
@@ -32,12 +183,14 @@
             <button id="btn_start">Start Live</button>
             <button id="btn_stop" disabled>Stop Live</button>
             <span id="live-status" class="status-fail">Desconectado</span>
-
-            <button id="btn_start_ronda" style="margin-left:20px;">Começar (ronda)</button>
-            <button id="btn_end_ronda" style="margin-left:8px;">Encerrar (relatório)</button>
+            
             <span id="ronda-messages"></span>
         </div>
-
+        
+        <div class="container-abaixo">
+        <button id="btn_start_ronda" style="margin-left:20px;">Começar (ronda)</button>
+        <button id="btn_end_ronda" style="margin-left:8px;">Encerrar (relatório)</button>
+        </div>
         <div class="preview-area">
             <div style="flex:0 0 660px;">
                 <h4>Preview (live):</h4>
@@ -52,7 +205,7 @@
             </div>
         </div>
 
-        <hr style="margin:18px 0;">
+        <hr style="margin:18px 0; border:0; border-top:1px solid #eef2f6;">
 
         <div id="report-area"></div>
 
@@ -234,19 +387,51 @@
         html.push(`<div class="report"><h3>Relatório da Ronda</h3>`);
         html.push(`<p><strong>Total encontrados na ronda:</strong> ${rel.total_found}</p>`);
         html.push(`<p><strong>Total registrados no inventário:</strong> ${rel.total_registered}</p>`);
-        html.push(`<h4>Caixas completas:</h4><ul>`);
-        (rel.boxes_found || []).forEach(b => {
+
+        // --- Caixas completas (deduplicando códigos iguais entre caixas) ---
+        // Vamos garantir que cada código apareça apenas uma vez na listagem de "caixas completas".
+        const seen = new Set();
+        const boxes_found = rel.boxes_found || [];
+
+        // Calcula resumo de códigos únicos que serão exibidos nas caixas completas
+        let uniqueCount = 0;
+        const boxes_display = []; // boxes com códigos filtrados (somente códigos ainda não vistos)
+        for (const box of boxes_found) {
+            const boxCodes = Array.isArray(box.codes) ? box.codes : [];
+            const filtered = [];
+            for (const c of boxCodes) {
+                if (!seen.has(c)) {
+                    filtered.push(c);
+                    seen.add(c);
+                }
+            }
+            if (filtered.length > 0) {
+                boxes_display.push({ qrs: box.qrs, bcs: box.bcs, codes: filtered });
+            }
+        }
+        uniqueCount = seen.size;
+
+        html.push(`<h4>Caixas completas (códigos únicos: ${uniqueCount}):</h4><ul>`);
+        boxes_display.forEach(b => {
             html.push(`<li>Caixa: ${JSON.stringify(b.codes)}</li>`);
         });
-        html.push(`</ul><h4>Caixas parciais:</h4><ul>`);
+        html.push(`</ul>`);
+
+        // --- Caixas parciais (mantemos como antes) ---
+        html.push(`<h4>Caixas parciais:</h4><ul>`);
         (rel.boxes_partial || []).forEach(b => {
             html.push(`<li>Presentes: ${JSON.stringify(b.codes_present)} | Faltando: ${JSON.stringify(b.codes_missing)}</li>`);
         });
-        html.push(`</ul><h4>Caixas não encontradas:</h4><ul>`);
+        html.push(`</ul>`);
+
+        // --- Caixas não encontradas (mantemos como antes) ---
+        html.push(`<h4>Caixas não encontradas:</h4><ul>`);
         (rel.boxes_missing || []).forEach(b => {
             html.push(`<li>Caixa: ${JSON.stringify(b.codes)}</li>`);
         });
-        html.push(`</ul><h4>Códigos encontrados que não estão no inventário:</h4><pre>${JSON.stringify(rel.only_found)}</pre>`);
+        html.push(`</ul>`);
+
+        html.push(`<h4>Códigos encontrados que não estão no inventário:</h4><pre>${JSON.stringify(rel.only_found)}</pre>`);
         html.push(`</div>`);
         reportArea.innerHTML = html.join('');
     }
@@ -260,12 +445,23 @@
                 headers: { 'Accept': 'application/json' }
             });
             const data = await resp.json();
+            // espera-se que o backend retorne um JSON com { ok: true, relatorio: {...} }
             if (data.ok && data.relatorio) {
                 rondaMessages.textContent = 'Ronda encerrada — relatório pronto.';
                 renderRelatorio(data.relatorio);
                 appendLog('Ronda encerrada — relatório gerado.', '');
             } else {
-                rondaMessages.textContent = 'Falha ao encerrar ronda.';
+                // caso o backend retorne HTML (render_template) em vez de JSON,
+                // tentamos extrair relatorio via fallback — mas o ideal é o backend enviar JSON.
+                try {
+                    // tenta interpretar corpo como texto e procurar por JSON (fallback muito simples)
+                    const text = await resp.text();
+                    // não vamos forçar parse se não for JSON válido
+                    rondaMessages.textContent = 'Ronda encerrada (resposta não-JSON). Ver console.';
+                    console.warn('Resposta /ronda/encerrar não veio em JSON:', text);
+                } catch (e) {
+                    rondaMessages.textContent = 'Falha ao encerrar ronda.';
+                }
             }
         } catch (e) {
             rondaMessages.textContent = 'Erro ao encerrar ronda: ' + e;
