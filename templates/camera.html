@@ -23,10 +23,97 @@
 		select { margin-top: 10px; }
 		#scanTable { width: 100%; }
 		#scanTable th, #scanTable td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+		
+		/* Novos estilos para melhorar a interface */
+		.camera-container {
+			position: relative;
+			background: #000;
+			border-radius: 8px;
+			overflow: hidden;
+		}
+		
+		.camera-overlay {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0,0,0,0.3);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: white;
+			font-size: 18px;
+		}
+		
+		.btn-camera {
+			margin: 5px;
+			min-width: 120px;
+		}
+		
+		.status-indicator {
+			display: inline-block;
+			width: 12px;
+			height: 12px;
+			border-radius: 50%;
+			margin-right: 8px;
+		}
+		
+		.status-online { background-color: #28a745; }
+		.status-offline { background-color: #dc3545; }
+		.status-scanning { background-color: #ffc107; animation: pulse 1s infinite; }
+		
+		@keyframes pulse {
+			0% { opacity: 1; }
+			50% { opacity: 0.5; }
+			100% { opacity: 1; }
+		}
+		
+		.ronda-progress {
+			background: #e9ecef;
+			border-radius: 4px;
+			height: 20px;
+			overflow: hidden;
+		}
+		
+		.ronda-progress-bar {
+			height: 100%;
+			background: linear-gradient(90deg, #007bff, #0056b3);
+			transition: width 0.3s ease;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: white;
+			font-size: 12px;
+		}
+		
+		.notification {
+			position: fixed;
+			top: 20px;
+			right: 20px;
+			background: #007bff;
+			color: white;
+			padding: 15px 20px;
+			border-radius: 5px;
+			box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+			z-index: 1000;
+			transform: translateX(350px);
+			transition: transform 0.3s ease;
+		}
+		
+		.notification.show {
+			transform: translateX(0);
+		}
+		
+		.notification.success { background: #28a745; }
+		.notification.error { background: #dc3545; }
+		.notification.warning { background: #ffc107; color: #000; }
 	</style>
 </head>
 
 <body>
+  <hr style="margin:18px 0; border:0; border-top:1px solid #eef2f6;">
+  <div id="report-area"></div>
 	<div class="wrapper">
 		<nav id="sidebar" class="sidebar js-sidebar">
 			<div class="sidebar-content js-simplebar">
@@ -111,11 +198,12 @@
 								<div class="card-body">
 									<div class="mb-3">
 										<div class="d-grid gap-2">
-											<button class="btn btn-success" id="startCameraBtn" onclick="requestCameraPermission()">
+											<button class="btn btn-success btn-camera" id="startCameraBtn">
 												<i class="align-middle" data-feather="camera"></i>
+												<span class="status-indicator status-offline" id="cameraStatusIndicator"></span>
 												Conectar Câmera do Dispositivo
 											</button>
-											<button class="btn btn-secondary" id="stopCameraBtn" onclick="stopCamera()" style="display: none;">
+											<button class="btn btn-secondary btn-camera" id="stopCameraBtn" style="display: none;">
 												<i class="align-middle" data-feather="camera-off"></i>
 												Parar Câmera
 											</button>
@@ -128,20 +216,29 @@
 									<div class="mb-3">
 										<label class="form-label">URL da Câmera IP (MJPEG):</label>
 										<div class="input-group">
-											<input type="text" class="form-control" id="ipUrl" value="http://192.168.1.100:8080/video">
-											<button class="btn btn-outline-primary" onclick="connectIpCamera()">Conectar IP</button>
+											<input type="text" class="form-control" id="ipUrl" value="http://192.168.1.100:8080/video" placeholder="Digite a URL da câmera IP">
+											<button class="btn btn-outline-primary btn-camera" id="connectIpBtn">
+												<i class="align-middle" data-feather="wifi"></i>
+												Conectar IP
+											</button>
 										</div>
 									</div>
-									<div class="text-center">
+									<div class="camera-container text-center">
 										<video id="video" autoplay playsinline style="display:none; max-width: 100%; border: 1px solid #333;"></video>
 										<img id="ipCamera" style="display:none; max-width: 100%; border: 1px solid #333;" crossorigin="anonymous">
 										<canvas id="canvas" style="max-width: 100%; border: 2px solid #007bff; border-radius: 8px;"></canvas>
-										<div class="mt-2">
-											<small class="text-muted">
-												<i class="align-middle" data-feather="info"></i>
-												Canvas de detecção - QR codes aparecerão com retângulo vermelho
-											</small>
+										<div class="camera-overlay" id="cameraOverlay">
+											<div>
+												<i class="align-middle" data-feather="camera"></i>
+												<div>Câmera desconectada</div>
+											</div>
 										</div>
+									</div>
+									<div class="mt-2 text-center">
+										<small class="text-muted">
+											<i class="align-middle" data-feather="info"></i>
+											Canvas de detecção - QR codes aparecerão com retângulo vermelho
+										</small>
 									</div>
 									<div class="mt-3">
 										<div id="qrResult" class="alert alert-info" style="display: none;"></div>
@@ -166,7 +263,7 @@
 										<input type="file" class="form-control" id="videoFile" accept="video/*">
 									</div>
 									<div class="d-grid">
-										<button class="btn btn-primary" onclick="uploadAndProcessVideo()" id="uploadBtn">
+										<button class="btn btn-primary" id="uploadBtn">
 											<i class="align-middle" data-feather="upload"></i>
 											Processar Vídeo
 										</button>
@@ -186,11 +283,108 @@
 							</div>
 						</div>
 						<div class="col-12">
-							<div class="card">
+							<div class="card mb-3">
 								<div class="card-header">
-									<h5 class="card-title mb-0">Resultados dos Scaneamentos</h5>
+									<h5 class="card-title mb-0">
+										<span class="status-indicator status-offline" id="rondaStatusIndicator"></span>
+										Controle de Ronda
+									</h5>
 								</div>
 								<div class="card-body">
+									<div class="row mb-3">
+										<div class="col-md-8">
+											<div class="d-flex gap-2">
+												<button class="btn btn-success btn-camera" id="btn_start_ronda">
+													<i class="align-middle" data-feather="play"></i>
+													Iniciar Ronda
+												</button>
+												<button class="btn btn-danger btn-camera" id="btn_end_ronda">
+													<i class="align-middle" data-feather="stop"></i>
+													Encerrar Ronda
+												</button>
+												<button class="btn btn-info btn-camera" id="btn_status_ronda">
+													<i class="align-middle" data-feather="info"></i>
+													Status
+												</button>
+											</div>
+										</div>
+										<div class="col-md-4">
+											<div id="ronda-progress-container" style="display: none;">
+												<small class="text-muted">Progresso da Ronda:</small>
+												<div class="ronda-progress">
+													<div class="ronda-progress-bar" id="ronda-progress-bar" style="width: 0%;">
+														0%
+													</div>
+												</div>
+											</div>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-12">
+											<div id="ronda-messages" class="alert alert-info">
+												<i class="align-middle" data-feather="info"></i>
+												Clique em "Iniciar Ronda" para começar o scaneamento.
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-12">
+							<div class="card">
+								<div class="card-header d-flex justify-content-between align-items-center">
+									<h5 class="card-title mb-0">
+										<i class="align-middle" data-feather="list"></i>
+										Resultados dos Scaneamentos
+									</h5>
+									<div>
+										<button class="btn btn-sm btn-outline-secondary" id="refreshTableBtn">
+											<i class="align-middle" data-feather="refresh-cw"></i>
+											Atualizar
+										</button>
+										<button class="btn btn-sm btn-outline-primary" id="exportTableBtn">
+											<i class="align-middle" data-feather="download"></i>
+											Exportar
+										</button>
+									</div>
+								</div>
+								<div class="card-body">
+									<div class="mb-3">
+										<div class="row">
+											<div class="col-md-3">
+												<div class="card bg-primary text-white">
+													<div class="card-body text-center">
+														<h3 id="totalScanned">0</h3>
+														<small>Total Escaneado</small>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="card bg-success text-white">
+													<div class="card-body text-center">
+														<h3 id="foundItems">0</h3>
+														<small>Itens Encontrados</small>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="card bg-warning text-white">
+													<div class="card-body text-center">
+														<h3 id="missingItems">0</h3>
+														<small>Itens Faltando</small>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="card bg-info text-white">
+													<div class="card-body text-center">
+														<h3 id="scanRate">0%</h3>
+														<small>Taxa de Sucesso</small>
+													</div>
+												</div>
+											</div>
+										</div>
+									</div>
 									<div class="table-responsive">
 										<table class="table table-hover" id="scanTable">
 											<thead>
@@ -204,6 +398,27 @@
 											</thead>
 											<tbody></tbody>
 										</table>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-12">
+							<div class="card" id="report-section" style="display: none;">
+								<div class="card-header d-flex justify-content-between align-items-center">
+									<h5 class="card-title mb-0">
+										<i class="align-middle" data-feather="file-text"></i>
+										Relatório da Ronda
+									</h5>
+									<div>
+										<button class="btn btn-sm btn-outline-primary" id="downloadReportBtn">
+											<i class="align-middle" data-feather="download"></i>
+											Download
+										</button>
+									</div>
+								</div>
+								<div class="card-body">
+									<div id="report-area">
+										<!-- Relatórios serão inseridos aqui via AJAX -->
 									</div>
 								</div>
 							</div>
@@ -240,22 +455,277 @@
 		</div>
 	</div>
 
+	<!-- Sistema de Notificações -->
+	<div id="notification" class="notification">
+		<span id="notificationText"></span>
+		<button onclick="hideNotification()" style="background: none; border: none; color: inherit; float: right; font-size: 18px; cursor: pointer;">&times;</button>
+	</div>
+
 	<script src="js/app.js"></script>
 	<script src="https://unpkg.com/feather-icons"></script>
 	<script>
-		// Inicializar ícones Feather
+	// ===== SISTEMA DE NOTIFICAÇÕES =====
+	function showNotification(message, type = 'info') {
+		const notification = document.getElementById('notification');
+		const notificationText = document.getElementById('notificationText');
+		
+		// Remove classes anteriores
+		notification.className = 'notification';
+		notification.classList.add(type);
+		
+		notificationText.textContent = message;
+		notification.classList.add('show');
+		
+		// Auto-hide após 5 segundos
+		setTimeout(() => {
+			hideNotification();
+		}, 5000);
+	}
+
+	function hideNotification() {
+		const notification = document.getElementById('notification');
+		notification.classList.remove('show');
+	}
+
+	// ===== FUNÇÕES DE STATUS =====
+	function updateCameraStatus(status, message) {
+		const indicator = document.getElementById('cameraStatusIndicator');
+		const overlay = document.getElementById('cameraOverlay');
+		const statusDiv = document.getElementById('cameraStatus');
+		
+		// Remove classes anteriores
+		indicator.className = 'status-indicator';
+		
+		switch(status) {
+			case 'online':
+				indicator.classList.add('status-online');
+				overlay.style.display = 'none';
+				statusDiv.className = 'alert alert-success';
+				statusDiv.innerHTML = '<i class="align-middle" data-feather="check-circle"></i> ' + message;
+				break;
+			case 'scanning':
+				indicator.classList.add('status-scanning');
+				overlay.style.display = 'none';
+				statusDiv.className = 'alert alert-warning';
+				statusDiv.innerHTML = '<i class="align-middle" data-feather="camera"></i> ' + message;
+				break;
+			case 'offline':
+			default:
+				indicator.classList.add('status-offline');
+				overlay.style.display = 'flex';
+				overlay.innerHTML = '<div><i class="align-middle" data-feather="camera-off"></i><div>Câmera desconectada</div></div>';
+				statusDiv.className = 'alert alert-warning';
+				statusDiv.innerHTML = '<i class="align-middle" data-feather="info"></i> ' + message;
+				break;
+		}
 		feather.replace();
+	}
+
+	function updateRondaStatus(status, message, progress = 0) {
+		const indicator = document.getElementById('rondaStatusIndicator');
+		const messagesDiv = document.getElementById('ronda-messages');
+		const progressContainer = document.getElementById('ronda-progress-container');
+		const progressBar = document.getElementById('ronda-progress-bar');
+		
+		// Remove classes anteriores
+		indicator.className = 'status-indicator';
+		
+		switch(status) {
+			case 'active':
+				indicator.classList.add('status-scanning');
+				messagesDiv.className = 'alert alert-success';
+				messagesDiv.innerHTML = '<i class="align-middle" data-feather="play"></i> ' + message;
+				progressContainer.style.display = 'block';
+				break;
+			case 'completed':
+				indicator.classList.add('status-online');
+				messagesDiv.className = 'alert alert-success';
+				messagesDiv.innerHTML = '<i class="align-middle" data-feather="check-circle"></i> ' + message;
+				progressContainer.style.display = 'block';
+				break;
+			case 'inactive':
+			default:
+				indicator.classList.add('status-offline');
+				messagesDiv.className = 'alert alert-info';
+				messagesDiv.innerHTML = '<i class="align-middle" data-feather="info"></i> ' + message;
+				progressContainer.style.display = 'none';
+				break;
+		}
+		
+		// Atualizar barra de progresso
+		if (progressContainer.style.display === 'block') {
+			progressBar.style.width = progress + '%';
+			progressBar.textContent = Math.round(progress) + '%';
+		}
+		
+		feather.replace();
+	}
+
+	function updateScanCounters(total, found, missing) {
+		document.getElementById('totalScanned').textContent = total;
+		document.getElementById('foundItems').textContent = found;
+		document.getElementById('missingItems').textContent = missing;
+		
+		const rate = total > 0 ? Math.round((found / total) * 100) : 0;
+		document.getElementById('scanRate').textContent = rate + '%';
+	}
+
+    // -------- Ronda (AJAX) com melhorias --------
+    const btnStartRonda = document.getElementById('btn_start_ronda');
+    const btnEndRonda = document.getElementById('btn_end_ronda');
+    const btnStatusRonda = document.getElementById('btn_status_ronda');
+    const rondaMessages = document.getElementById('ronda-messages');
+    const reportArea = document.getElementById('report-area');
+
+    if (btnStartRonda) {
+      btnStartRonda.onclick = async function() {
+        btnStartRonda.disabled = true;
+        updateRondaStatus('active', 'Iniciando ronda...', 0);
+        
+        try {
+          const resp = await fetch('/ronda/comecar', { method: 'POST', headers: { 'Accept': 'application/json' } });
+          const data = await resp.json();
+          if (data.status === 'success') {
+            updateRondaStatus('active', data.message || 'Ronda iniciada.', 0);
+            showNotification('Ronda iniciada com sucesso!', 'success');
+            btnEndRonda.disabled = false;
+          } else {
+            updateRondaStatus('inactive', 'Falha ao iniciar ronda: ' + (data.message || 'Erro desconhecido'));
+            showNotification('Falha ao iniciar ronda: ' + (data.message || 'Erro desconhecido'), 'error');
+            btnStartRonda.disabled = false;
+          }
+        } catch (e) {
+          updateRondaStatus('inactive', 'Erro ao iniciar ronda: ' + e);
+          showNotification('Erro ao conectar com o servidor', 'error');
+          btnStartRonda.disabled = false;
+        }
+      };
+    }
+
+    if (btnEndRonda) {
+      btnEndRonda.onclick = async function() {
+        btnEndRonda.disabled = true;
+        updateRondaStatus('active', 'Encerrando ronda...', 100);
+        
+        try {
+          const resp = await fetch('/ronda/encerrar', { method: 'POST', headers: { 'Accept': 'application/json' } });
+          const data = await resp.json();
+          if (data.status === 'success') {
+            updateRondaStatus('completed', 'Ronda encerrada — relatório pronto.', 100);
+            renderRelatorio(data);
+            showNotification('Ronda encerrada com sucesso!', 'success');
+            btnStartRonda.disabled = false;
+          } else {
+            updateRondaStatus('inactive', 'Falha ao encerrar ronda: ' + (data.message || 'Erro desconhecido'));
+            showNotification('Falha ao encerrar ronda: ' + (data.message || 'Erro desconhecido'), 'error');
+          }
+        } catch (e) {
+          updateRondaStatus('inactive', 'Erro ao encerrar ronda: ' + e);
+          showNotification('Erro ao conectar com o servidor', 'error');
+        } finally {
+          btnEndRonda.disabled = false;
+        }
+      };
+    }
+
+    // Adicionar função de status da ronda
+    if (btnStatusRonda) {
+      btnStatusRonda.onclick = async function() {
+        try {
+          const resp = await fetch('/ronda/status', { method: 'GET', headers: { 'Accept': 'application/json' } });
+          const data = await resp.json();
+          if (data.status === 'success') {
+            const progress = data.progress || 0;
+            const message = data.message || 'Status obtido com sucesso';
+            updateRondaStatus(data.ronda_active ? 'active' : 'inactive', message, progress);
+            showNotification('Status atualizado: ' + message, 'info');
+            
+            // Atualizar contadores se disponível
+            if (data.total_scanned !== undefined) {
+              updateScanCounters(data.total_scanned, data.found_items, data.missing_items);
+            }
+          } else {
+            showNotification('Erro ao obter status: ' + (data.message || 'Erro desconhecido'), 'error');
+          }
+        } catch (e) {
+          showNotification('Erro ao conectar com o servidor', 'error');
+        }
+      };
+    }
+
+    function renderRelatorio(rel) {
+      // Mostrar a seção de relatórios
+      const reportSection = document.getElementById('report-section');
+      if (reportSection) {
+        reportSection.style.display = 'block';
+      }
+      
+      let html = `<div class="report">`;
+      html += `<div class="row">`;
+      html += `<div class="col-md-6">`;
+      html += `<h5>Resumo</h5>`;
+      html += `<ul class="list-unstyled">`;
+      html += `<li><strong>Total encontrados na ronda:</strong> <span class="badge bg-primary">${rel.total_found}</span></li>`;
+      html += `<li><strong>Total registrados no inventário:</strong> <span class="badge bg-info">${rel.total_registered}</span></li>`;
+      html += `<li><strong>Códigos em comum:</strong> <span class="badge bg-success">${rel.common ? rel.common.length : 0}</span></li>`;
+      html += `</ul>`;
+      html += `</div>`;
+      html += `<div class="col-md-6">`;
+      html += `<h5>Caixas</h5>`;
+      html += `<ul class="list-unstyled">`;
+      html += `<li><strong>Caixas completas:</strong> <span class="badge bg-success">${rel.boxes_found ? rel.boxes_found.length : 0}</span></li>`;
+      html += `<li><strong>Caixas parciais:</strong> <span class="badge bg-warning">${rel.boxes_partial ? rel.boxes_partial.length : 0}</span></li>`;
+      html += `<li><strong>Caixas não encontradas:</strong> <span class="badge bg-danger">${rel.boxes_missing ? rel.boxes_missing.length : 0}</span></li>`;
+      html += `</ul>`;
+      html += `</div>`;
+      html += `</div>`;
+      
+      if (rel.only_found && rel.only_found.length > 0) {
+        html += `<div class="mt-3">`;
+        html += `<h6>Códigos encontrados que não estão no inventário:</h6>`;
+        html += `<div class="alert alert-warning">`;
+        rel.only_found.forEach(code => {
+          html += `<span class="badge bg-warning me-1">${code}</span>`;
+        });
+        html += `</div>`;
+        html += `</div>`;
+      }
+      
+      if (rel.only_registered && rel.only_registered.length > 0) {
+        html += `<div class="mt-3">`;
+        html += `<h6>Códigos registrados que não foram encontrados:</h6>`;
+        html += `<div class="alert alert-info">`;
+        rel.only_registered.forEach(code => {
+          html += `<span class="badge bg-secondary me-1">${code}</span>`;
+        });
+        html += `</div>`;
+        html += `</div>`;
+      }
+      
+      html += `</div>`;
+      reportArea.innerHTML = html;
+    }
 	</script>
 
   <script>
-    // Variáveis globais
+    // Verificar se elementos existem antes de atribuir
+    console.log('Iniciando script de câmera...');
+    
+    // Variáveis globais com verificação de existência
     const video = document.getElementById('video');
     const cameraSelect = document.getElementById('cameraSelect');
     const canvas = document.getElementById('canvas');
     const qrResult = document.getElementById('qrResult');
     const cameraStatus = document.getElementById('cameraStatus');
     const scanTableBody = document.querySelector('#scanTable tbody');
-    const ctx = canvas.getContext('2d');
+    
+    if (!video) console.error('Elemento video não encontrado');
+    if (!canvas) console.error('Elemento canvas não encontrado');
+    if (!qrResult) console.error('Elemento qrResult não encontrado');
+    if (!cameraStatus) console.error('Elemento cameraStatus não encontrado');
+    if (!scanTableBody) console.error('Elemento scanTableBody não encontrado');
+    
+    const ctx = canvas ? canvas.getContext('2d') : null;
     let currentStream;
     let lastScanned = {};
     let scanningInterval;
@@ -441,33 +911,39 @@
     }
 
     async function scanQRCodeAndBarcode() {
-      const ipCamera = document.getElementById('ipCamera');
-      let sourceElement = null;
-      
-      // Verificar qual fonte de vídeo está ativa
-      if (ipCamera.style.display !== 'none' && ipCamera.src) {
-        // Para câmera IP, verificar se a imagem está carregada
-        if (ipCamera.complete && ipCamera.naturalWidth > 0) {
-          sourceElement = ipCamera;
-        }
-      } else if (video.style.display !== 'none' && currentStream) {
-        sourceElement = video;
-      }
-      
-      if (!sourceElement) {
-        return;
-      }
-
-      // Configurar canvas com dimensões adequadas
-      const targetWidth = 640;
-      const targetHeight = 480;
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      
-      // Limpar canvas anterior
-      ctx.clearRect(0, 0, targetWidth, targetHeight);
-      
       try {
+        // Verificar se todos os elementos necessários existem
+        if (!video || !canvas || !ctx) {
+          console.warn('Elementos de vídeo ou canvas não encontrados');
+          return;
+        }
+
+        const ipCamera = document.getElementById('ipCamera');
+        let sourceElement = null;
+        
+        // Verificar qual fonte de vídeo está ativa
+        if (ipCamera && ipCamera.style.display !== 'none' && ipCamera.src) {
+          // Para câmera IP, verificar se a imagem está carregada
+          if (ipCamera.complete && ipCamera.naturalWidth > 0) {
+            sourceElement = ipCamera;
+          }
+        } else if (video.style.display !== 'none' && currentStream) {
+          sourceElement = video;
+        }
+        
+        if (!sourceElement) {
+          return;
+        }
+
+        // Configurar canvas com dimensões adequadas
+        const targetWidth = 640;
+        const targetHeight = 480;
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        
+        // Limpar canvas anterior
+        ctx.clearRect(0, 0, targetWidth, targetHeight);
+        
         // Desenhar a imagem no canvas
         ctx.drawImage(sourceElement, 0, 0, targetWidth, targetHeight);
         const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
@@ -516,66 +992,77 @@
             lastScanned[code.data] = 'QR Code';
           }
           
-          qrResult.style.display = 'block';
-          qrResult.textContent = qrText;
-          qrResult.className = 'alert alert-success';
+          if (qrResult) {
+            qrResult.style.display = 'block';
+            qrResult.textContent = qrText;
+            qrResult.className = 'alert alert-success';
+          }
           return;
         }
 
         // Se não encontrou QR code, tentar código de barras (apenas ocasionalmente para não sobrecarregar)
         if (Math.random() < 0.3) { // 30% de chance para reduzir carga
-          Quagga.decodeSingle({
-            src: canvas.toDataURL(),
-            numOfWorkers: 0,
-            inputStream: { 
-              size: 640,
-              type: "LiveStream"
-            },
-            decoder: {
-              readers: [
-                "code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader",
-                "code_39_vin_reader", "codabar_reader", "upc_reader", "upc_e_reader",
-                "i2of5_reader", "2of5_reader", "code_93_reader"
-              ]
+          if (canvas && typeof canvas.toDataURL === 'function' && typeof Quagga !== 'undefined') {
+            try {
+              Quagga.decodeSingle({
+                src: canvas.toDataURL(),
+                numOfWorkers: 0,
+                inputStream: { 
+                  size: 640,
+                  type: "LiveStream"
+                },
+                decoder: {
+                  readers: [
+                    "code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader",
+                    "code_39_vin_reader", "codabar_reader", "upc_reader", "upc_e_reader",
+                    "i2of5_reader", "2of5_reader", "code_93_reader"
+                  ]
+                }
+              }, function(result) {
+                if(result && result.codeResult) {
+                  const barcodeText = `Código de Barras: ${result.codeResult.code}`;
+                  console.log('Código de barras detectado:', result.codeResult.code);
+                  // Desenhar retângulo para código de barras
+                  if (result.codeResult.start && result.codeResult.end && ctx) {
+                    try {
+                      ctx.beginPath();
+                      ctx.lineWidth = 4;
+                      ctx.strokeStyle = "#00FF00";
+                      ctx.rect(result.codeResult.start.x - 10, result.codeResult.start.y - 10, 
+                              (result.codeResult.end.x - result.codeResult.start.x) + 20, 20);
+                      ctx.stroke();
+                      ctx.fillStyle = "#00FF00";
+                      ctx.font = "bold 16px Arial";
+                      ctx.fillText("BARCODE", result.codeResult.start.x, result.codeResult.start.y - 15);
+                    } catch (drawError) {
+                      console.warn('Erro ao desenhar retângulo do código de barras:', drawError);
+                    }
+                  }
+                  if (lastScanned[result.codeResult.code] !== 'Código de Barras') {
+                    addScanToTable(result.codeResult.code, 'Código de Barras', 'Ok', sourceElement === ipCamera ? 'Câmera IP' : 'Câmera ao Vivo');
+                    lastScanned[result.codeResult.code] = 'Código de Barras';
+                  }
+                  if (qrResult) {
+                    qrResult.style.display = 'block';
+                    qrResult.textContent = barcodeText;
+                    qrResult.className = 'alert alert-success';
+                  }
+                }
+              });
+            } catch (quaggaError) {
+              console.warn('Erro no Quagga:', quaggaError);
             }
-          }, function(result) {
-            if(result && result.codeResult) {
-              const barcodeText = `Código de Barras: ${result.codeResult.code}`;
-              console.log('Código de barras detectado:', result.codeResult.code);
-              
-              // Desenhar retângulo para código de barras
-              if (result.codeResult.start && result.codeResult.end) {
-                ctx.beginPath();
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = "#00FF00";
-                ctx.rect(result.codeResult.start.x - 10, result.codeResult.start.y - 10, 
-                        (result.codeResult.end.x - result.codeResult.start.x) + 20, 20);
-                ctx.stroke();
-                
-                ctx.fillStyle = "#00FF00";
-                ctx.font = "bold 16px Arial";
-                ctx.fillText("BARCODE", result.codeResult.start.x, result.codeResult.start.y - 15);
-              }
-              
-              if (lastScanned[result.codeResult.code] !== 'Código de Barras') {
-                addScanToTable(result.codeResult.code, 'Código de Barras', 'Ok', sourceElement === ipCamera ? 'Câmera IP' : 'Câmera ao Vivo');
-                lastScanned[result.codeResult.code] = 'Código de Barras';
-              }
-              
-              qrResult.style.display = 'block';
-              qrResult.textContent = barcodeText;
-              qrResult.className = 'alert alert-success';
-            }
-          });
+          } else {
+            console.warn('Canvas inválido ou Quagga não disponível.');
+          }
         } else {
           // Mostrar status de aguardando apenas se não há resultado anterior
-          if (!qrResult.style.display || qrResult.style.display === 'none') {
+          if (qrResult && (!qrResult.style.display || qrResult.style.display === 'none')) {
             qrResult.style.display = 'block';
             qrResult.textContent = 'Aguardando detecção...';
             qrResult.className = 'alert alert-warning';
           }
         }
-        
       } catch (error) {
         console.error('Erro durante o scanning:', error);
       }
@@ -664,17 +1151,227 @@
       }
     }
 
-    // Inicialização
+    // Inicializar feather icons quando a página e scripts carregarem
     document.addEventListener('DOMContentLoaded', function() {
-      // Verificar se há suporte a getUserMedia
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        cameraStatus.textContent = 'Seu navegador não suporta acesso à câmera';
-        cameraStatus.className = 'alert alert-danger';
-        document.getElementById('startCameraBtn').disabled = true;
+      // Aguardar um pouco para garantir que todos os scripts carregaram
+      setTimeout(function() {
+        if (typeof feather !== 'undefined' && feather.replace) {
+          feather.replace();
+        } else {
+          console.warn('Feather icons não carregado ainda');
+        }
+      }, 100);
+    });
+
+    // Verificar se as funções foram definidas corretamente
+    console.log('Funções definidas:');
+    console.log('requestCameraPermission:', typeof requestCameraPermission);
+    console.log('getCameras:', typeof getCameras);
+    console.log('startCamera:', typeof startCamera);
+    console.log('startScanning:', typeof startScanning);
+
+    // Adicionar event listeners após definir as funções
+    document.addEventListener('DOMContentLoaded', function() {
+      const startCameraBtn = document.getElementById('startCameraBtn');
+      const stopCameraBtn = document.getElementById('stopCameraBtn');
+      const connectIpBtn = document.getElementById('connectIpBtn');
+      const uploadBtn = document.getElementById('uploadBtn');
+      
+      if (startCameraBtn) {
+        startCameraBtn.addEventListener('click', function() {
+          console.log('Botão de câmera clicado');
+          if (typeof requestCameraPermission === 'function') {
+            requestCameraPermission();
+          } else {
+            console.error('Função requestCameraPermission não está definida');
+          }
+        });
+      }
+      
+      if (stopCameraBtn) {
+        stopCameraBtn.addEventListener('click', function() {
+          console.log('Botão parar câmera clicado');
+          if (typeof stopCamera === 'function') {
+            stopCamera();
+          } else {
+            console.error('Função stopCamera não está definida');
+          }
+        });
+      }
+
+      if (connectIpBtn) {
+        connectIpBtn.addEventListener('click', function() {
+          console.log('Botão conectar IP clicado');
+          if (typeof connectIpCamera === 'function') {
+            connectIpCamera();
+          } else {
+            console.error('Função connectIpCamera não está definida');
+          }
+        });
+      }
+
+      if (uploadBtn) {
+        uploadBtn.addEventListener('click', function() {
+          console.log('Botão upload clicado');
+          if (typeof uploadAndProcessVideo === 'function') {
+            uploadAndProcessVideo();
+          } else {
+            console.error('Função uploadAndProcessVideo não está definida');
+          }
+        });
+      }
+      
+      // Novos botões de funcionalidades
+      const refreshTableBtn = document.getElementById('refreshTableBtn');
+      const exportTableBtn = document.getElementById('exportTableBtn');
+      const downloadReportBtn = document.getElementById('downloadReportBtn');
+      
+      if (refreshTableBtn) {
+        refreshTableBtn.addEventListener('click', function() {
+          showNotification('Atualizando tabela...', 'info');
+          // Aqui você pode implementar a lógica de refresh da tabela
+          loadScanResults(); // Função que você já deve ter no sistema
+        });
+      }
+      
+      if (exportTableBtn) {
+        exportTableBtn.addEventListener('click', function() {
+          showNotification('Exportando dados...', 'info');
+          // Implementar export para CSV/Excel
+          exportTableToCSV();
+        });
+      }
+      
+      if (downloadReportBtn) {
+        downloadReportBtn.addEventListener('click', function() {
+          showNotification('Baixando relatório...', 'info');
+          // Implementar download do relatório
+          downloadReport();
+        });
       }
     });
-  </script>
-
+    
+    // ===== FUNÇÕES AUXILIARES =====
+    function exportTableToCSV() {
+      const table = document.getElementById('scanTable');
+      let csv = [];
+      const rows = table.querySelectorAll('tr');
+      
+      for (let i = 0; i < rows.length; i++) {
+        const row = [], cols = rows[i].querySelectorAll('td, th');
+        
+        for (let j = 0; j < cols.length; j++) {
+          row.push(cols[j].innerText);
+        }
+        
+        csv.push(row.join(','));
+      }
+      
+      // Download CSV
+      const csvFile = new Blob([csv.join('\n')], {type: 'text/csv'});
+      const downloadLink = document.createElement('a');
+      downloadLink.download = 'scan_results.csv';
+      downloadLink.href = window.URL.createObjectURL(csvFile);
+      downloadLink.style.display = 'none';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      showNotification('Tabela exportada com sucesso!', 'success');
+    }
+    
+    function downloadReport() {
+      const reportArea = document.getElementById('report-area');
+      if (reportArea && reportArea.innerHTML.trim() !== '') {
+        const reportContent = reportArea.innerHTML;
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Relatório da Ronda</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .badge { padding: 2px 8px; border-radius: 3px; color: white; }
+              .bg-primary { background-color: #007bff; }
+              .bg-success { background-color: #28a745; }
+              .bg-warning { background-color: #ffc107; color: black; }
+              .bg-danger { background-color: #dc3545; }
+              .bg-info { background-color: #17a2b8; }
+              table { border-collapse: collapse; width: 100%; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f2f2f2; }
+            </style>
+          </head>
+          <body>
+            <h1>Relatório da Ronda - ${new Date().toLocaleString()}</h1>
+            ${reportContent}
+          </body>
+          </html>
+        `;
+        
+        const blob = new Blob([htmlContent], {type: 'text/html'});
+        const downloadLink = document.createElement('a');
+        downloadLink.download = 'relatorio_ronda.html';
+        downloadLink.href = window.URL.createObjectURL(blob);
+        downloadLink.style.display = 'none';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        showNotification('Relatório baixado com sucesso!', 'success');
+      } else {
+        showNotification('Nenhum relatório disponível para download', 'warning');
+      }
+    }
+    
+    // Melhorar a função existente de atualização de status da câmera
+    function enhanceCameraFunctions() {
+      // Interceptar as funções existentes de câmera para adicionar status visual
+      const originalStartCamera = window.startCamera;
+      const originalStopCamera = window.stopCamera;
+      const originalConnectIpCamera = window.connectIpCamera;
+      
+      if (originalStartCamera) {
+        window.startCamera = function() {
+          updateCameraStatus('scanning', 'Iniciando câmera...');
+          const result = originalStartCamera.apply(this, arguments);
+          setTimeout(() => {
+            updateCameraStatus('online', 'Câmera conectada e escaneando');
+          }, 1000);
+          return result;
+        };
+      }
+      
+      if (originalStopCamera) {
+        window.stopCamera = function() {
+          updateCameraStatus('offline', 'Parando câmera...');
+          const result = originalStopCamera.apply(this, arguments);
+          setTimeout(() => {
+            updateCameraStatus('offline', 'Câmera desconectada');
+          }, 500);
+          return result;
+        };
+      }
+      
+      if (originalConnectIpCamera) {
+        window.connectIpCamera = function() {
+          updateCameraStatus('scanning', 'Conectando à câmera IP...');
+          const result = originalConnectIpCamera.apply(this, arguments);
+          setTimeout(() => {
+            updateCameraStatus('online', 'Câmera IP conectada');
+          }, 1000);
+          return result;
+        };
+      }
+    }
+    
+    // Inicializar melhorias quando a página carregar
+    document.addEventListener('DOMContentLoaded', function() {
+      enhanceCameraFunctions();
+      updateCameraStatus('offline', 'Clique em "Conectar Câmera" para iniciar o scanner');
+      updateRondaStatus('inactive', 'Clique em "Iniciar Ronda" para começar o scaneamento.');
+    });
+    
+    </script>
 </body>
-
 </html>

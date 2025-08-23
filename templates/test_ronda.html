@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Ronda</title>
+</head>
+<body>
+    <h1>Teste de Ronda</h1>
+    <button id="btn_start_ronda">Iniciar Ronda</button>
+    <button id="btn_end_ronda">Encerrar Ronda</button>
+    <div id="ronda-messages"></div>
+    <div id="report-area"></div>
+
+    <script>
+        const btnStartRonda = document.getElementById('btn_start_ronda');
+        const btnEndRonda = document.getElementById('btn_end_ronda');
+        const rondaMessages = document.getElementById('ronda-messages');
+        const reportArea = document.getElementById('report-area');
+
+        async function startRonda() {
+            btnStartRonda.disabled = true;
+            rondaMessages.textContent = 'Iniciando ronda...';
+            try {
+                console.log('Fazendo chamada para /ronda/comecar');
+                const resp = await fetch('/ronda/comecar', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                console.log('Resposta recebida:', resp.status, resp.statusText);
+                
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+                }
+                
+                const data = await resp.json();
+                console.log('Dados parseados:', data);
+                
+                if (data.ok) {
+                    rondaMessages.textContent = data.msg || 'Ronda iniciada.';
+                    console.log('Ronda iniciada com sucesso');
+                } else {
+                    rondaMessages.textContent = 'Falha ao iniciar ronda: ' + (data.msg || 'erro desconhecido');
+                    console.error('Falha retornada pela API:', data);
+                }
+            } catch (e) {
+                console.error('Erro na função startRonda:', e);
+                rondaMessages.textContent = 'Erro ao iniciar ronda: ' + e.message;
+            } finally {
+                btnStartRonda.disabled = false;
+            }
+        }
+
+        async function endRonda() {
+            btnEndRonda.disabled = true;
+            rondaMessages.textContent = 'Encerrando ronda...';
+            try {
+                console.log('Fazendo chamada para /ronda/encerrar');
+                const resp = await fetch('/ronda/encerrar', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                console.log('Resposta recebida:', resp.status, resp.statusText);
+                
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+                }
+                
+                const data = await resp.json();
+                console.log('Dados parseados:', data);
+                
+                if (data.ok && data.relatorio) {
+                    rondaMessages.textContent = 'Ronda encerrada com sucesso.';
+                    reportArea.innerHTML = '<pre>' + JSON.stringify(data.relatorio, null, 2) + '</pre>';
+                    console.log('Ronda encerrada com sucesso');
+                } else {
+                    rondaMessages.textContent = 'Falha ao encerrar ronda: ' + (data.msg || 'erro desconhecido');
+                    console.error('Falha retornada pela API:', data);
+                }
+            } catch (e) {
+                console.error('Erro na função endRonda:', e);
+                rondaMessages.textContent = 'Erro ao encerrar ronda: ' + e.message;
+            } finally {
+                btnEndRonda.disabled = false;
+            }
+        }
+
+        btnStartRonda.addEventListener('click', startRonda);
+        btnEndRonda.addEventListener('click', endRonda);
+    </script>
+</body>
+</html>
